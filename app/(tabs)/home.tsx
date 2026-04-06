@@ -11,13 +11,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import StatCard from '../../components/StatCard';
 import SpendingPieChart from '../../components/SpendingPieChart';
 import DailyBarChart from '../../components/DailyBarChart';
+import DashboardInsights from '../../components/DashboardInsights';
 import RecentExpenses from '../../components/RecentExpenses';
-import PeriodFilter from '../../components/PeriodFilter';
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  const [period, setPeriod] = useState<Period>('month');
+  const [period, setPeriod] = useState<Period>('today');
   const [refreshing, setRefreshing] = useState(false);
 
   const {
@@ -25,8 +25,11 @@ export default function HomeScreen() {
     weekTotal,
     monthTotal,
     byCategory,
-    dailyData,
+    historicalWeeksData,
     recentExpenses,
+    topCategory,
+    averageDailySpend,
+    largestExpense,
   } = useDashboardStats(period);
 
   const onRefresh = async () => {
@@ -69,17 +72,36 @@ export default function HomeScreen() {
 
         {/* Stat cards */}
         <View style={styles.statsRow}>
-          <StatCard label="Today" amount={todayTotal} />
-          <StatCard label="This week" amount={weekTotal} />
-          <StatCard label="This month" amount={monthTotal} highlight />
+          <StatCard
+            label="Today"
+            amount={todayTotal}
+            highlight={period === 'today'}
+            onPress={() => setPeriod('today')}
+          />
+          <StatCard
+            label="This week"
+            amount={weekTotal}
+            highlight={period === 'week'}
+            onPress={() => setPeriod('week')}
+          />
+          <StatCard
+            label="This month"
+            amount={monthTotal}
+            highlight={period === 'month'}
+            onPress={() => setPeriod('month')}
+          />
         </View>
-
-        {/* Period filter */}
-        <PeriodFilter active={period} onChange={setPeriod} />
 
         {/* Charts */}
         <SpendingPieChart data={byCategory} />
-        <DailyBarChart data={dailyData} />
+        <DailyBarChart historicalWeeksData={historicalWeeksData} />
+
+        {/* Insights */}
+        <DashboardInsights
+          topCategory={topCategory}
+          averageDailySpend={averageDailySpend}
+          largestExpense={largestExpense}
+        />
 
         {/* Recent expenses */}
         <RecentExpenses expenses={recentExpenses} />
