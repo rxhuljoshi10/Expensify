@@ -29,7 +29,10 @@ export default function TabsLayout() {
           title: '',
           tabBarIcon: () => (
             <View style={styles.addButton}>
-              <View style={styles.addButtonInner} />
+              <View style={styles.plusContainer}>
+                <View style={styles.horizontal} />
+                <View style={styles.vertical} />
+              </View>
             </View>
           ),
           tabBarButton: (props) => (
@@ -61,11 +64,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#6C63FF', alignItems: 'center', justifyContent: 'center',
     marginBottom: 20,
   },
-  addButtonInner: {
-    width: 20, height: 20,
-    borderTopWidth: 2.5, borderLeftWidth: 2.5,
-    borderColor: '#fff',
-    transform: [{ rotate: '135deg' }],
-    marginTop: 4,
+  plusContainer: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  horizontal: {
+    position: 'absolute',
+    width: 20,
+    height: 2.5,
+    backgroundColor: '#fff',
+  },
+
+  vertical: {
+    position: 'absolute',
+    width: 2.5,
+    height: 20,
+    backgroundColor: '#fff',
   },
 });
