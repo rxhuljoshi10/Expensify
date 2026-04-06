@@ -23,3 +23,15 @@ export interface CreateExpenseInput {
     description?: string;
     expense_date: string;
 }
+
+// Add to types/expense.ts
+export interface Budget {
+    id: string;
+    user_id: string;
+    month: string;          // 'YYYY-MM' format e.g. '2026-04'
+    total_budget: number;   // in paise
+    category_budgets?: Record<string, number>;
+    alert_at_pct: number;
+    alerted_80: boolean;
+    alerted_100: boolean;
+}

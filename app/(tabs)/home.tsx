@@ -13,12 +13,15 @@ import SpendingPieChart from '../../components/SpendingPieChart';
 import DailyBarChart from '../../components/DailyBarChart';
 import DashboardInsights from '../../components/DashboardInsights';
 import RecentExpenses from '../../components/RecentExpenses';
+import { useBudget } from '../../hooks/useBudget';
+import BudgetCard from '../../components/BudgetCard';
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState<Period>('today');
   const [refreshing, setRefreshing] = useState(false);
+  const { data: budget } = useBudget();
 
   const {
     todayTotal,
@@ -95,6 +98,8 @@ export default function HomeScreen() {
         {/* Charts */}
         <SpendingPieChart data={byCategory} />
         <DailyBarChart historicalWeeksData={historicalWeeksData} />
+        {/* Budget card — add this after statsRow View */}
+        <BudgetCard budget={budget ?? null} spentPaise={monthTotal} />
 
         {/* Insights */}
         <DashboardInsights
