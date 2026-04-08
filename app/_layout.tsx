@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
+import Toast from 'react-native-toast-message';
+import OfflineBanner from '../components/OfflineBanner';
 
 const queryClient = new QueryClient();
 
@@ -32,10 +34,21 @@ function AuthGuard() {
   return <Slot />;
 }
 
+// export default function RootLayout() {
+//   return (
+//     <QueryClientProvider client={queryClient}>
+//       <AuthGuard />
+//       <Toast />
+//     </QueryClientProvider>
+//   );
+// }
+
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGuard />
+      <OfflineBanner />
+      <Toast />
     </QueryClientProvider>
   );
 }

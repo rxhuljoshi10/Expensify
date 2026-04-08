@@ -6,15 +6,23 @@ import { CATEGORIES } from '../constants/categories';
 
 export type Period = 'today' | 'week' | 'month' | 'custom';
 
+/** Parse a YYYY-MM-DD string as LOCAL midnight (avoids UTC→local timezone shift). */
+const parseLocalDate = (dateStr: string): Date => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
 const startOf = (period: Period, customFrom?: Date): Date => {
     const now = new Date();
     if (period === 'today') {
         return new Date(now.getFullYear(), now.getMonth(), now.getDate());
     }
     if (period === 'week') {
-        const d = new Date(now);
-        d.setDate(d.getDate() - 6);
-        d.setHours(0, 0, 0, 0);
+        // Calendar week: Monday of the current week
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const day = d.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        d.setDate(d.getDate() + diffToMonday);
         return d;
     }
     if (period === 'month') {
@@ -33,7 +41,7 @@ const filterByPeriod = (
     const from = startOf(period, customFrom);
     const to = customTo ?? new Date();
     return expenses.filter(e => {
-        const d = new Date(e.expense_date);
+        const d = parseLocalDate(e.expense_date);
         return d >= from && d <= to;
     });
 };
@@ -158,5 +166,5 @@ export const useDashboardStats = (
             averageDailySpend,
             largestExpense,
         };
-    }, [expenses, period, customFrom, customTo, isLoading]);
+    }, [expenses, period, customFrom, customTo]);
 };

@@ -4,12 +4,13 @@ import { useRouter } from 'expo-router';
 import { Expense } from '../types/expense';
 import { getCategoryMeta } from '../constants/categories';
 import { formatAmount } from '../lib/currency';
+import { useTheme, Theme } from '../lib/theme';
 
-interface Props {
-    expenses: Expense[];
-}
+interface Props { expenses: Expense[]; }
 
 export default function RecentExpenses({ expenses }: Props) {
+    const theme = useTheme();
+    const styles = createStyles(theme);
     const router = useRouter();
 
     return (
@@ -26,11 +27,7 @@ export default function RecentExpenses({ expenses }: Props) {
                 expenses.map(e => {
                     const cat = getCategoryMeta(e.category);
                     return (
-                        <TouchableOpacity
-                            key={e.id}
-                            style={styles.row}
-                            onPress={() => router.push(`/edit-expense?id=${e.id}`)}
-                        >
+                        <TouchableOpacity key={e.id} style={styles.row} onPress={() => router.push(`/edit-expense?id=${e.id}`)}>
                             <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
                                 <Text style={styles.icon}>{cat.icon}</Text>
                             </View>
@@ -47,17 +44,19 @@ export default function RecentExpenses({ expenses }: Props) {
     );
 }
 
-const styles = StyleSheet.create({
-    container: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-    heading: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
-    seeAll: { fontSize: 13, color: '#6C63FF' },
-    empty: { color: '#aaa', fontSize: 14, textAlign: 'center', paddingVertical: 16 },
-    row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
-    iconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-    icon: { fontSize: 18 },
-    info: { flex: 1 },
-    merchant: { fontSize: 14, fontWeight: '500', color: '#1a1a1a' },
-    category: { fontSize: 12, color: '#aaa', marginTop: 2 },
-    amount: { fontSize: 14, fontWeight: '600', color: '#1a1a1a' },
-});
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        container: { backgroundColor: theme.cardBg, borderRadius: 16, padding: 16, marginBottom: 16 },
+        header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+        heading: { fontSize: 15, fontWeight: '600', color: theme.text },
+        seeAll: { fontSize: 13, color: theme.primary },
+        empty: { color: theme.textSecondary, fontSize: 14, textAlign: 'center', paddingVertical: 16 },
+        row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
+        iconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+        icon: { fontSize: 18 },
+        info: { flex: 1 },
+        merchant: { fontSize: 14, fontWeight: '500', color: theme.text },
+        category: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+        amount: { fontSize: 14, fontWeight: '600', color: theme.text },
+    });
+}
