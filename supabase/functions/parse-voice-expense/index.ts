@@ -2,7 +2,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 
-const GOOGLE_CLOUD_API_KEY = Deno.env.get('GOOGLE_CLOUD_API_KEY') || 'AIzaSyCUmxhV9APZ7TNNHqI9cMFZW5gsZGPEm2U';
+const GOOGLE_CLOUD_API_KEY = Deno.env.get('GOOGLE_CLOUD_API_KEY')';
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')!;
 
 const CATEGORIES = [
