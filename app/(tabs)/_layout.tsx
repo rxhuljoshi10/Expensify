@@ -54,6 +54,13 @@ export default function TabsLayout() {
         name="profile"
         options={{ title: 'Profile', tabBarIcon: ({ color }) => <TabIcon emoji="👤" color={color} active={color === theme.primary} /> }}
       />
+      <Tabs.Screen
+        name="voice"
+        options={{
+          title: 'Voice',
+          tabBarIcon: ({ color }) => <TabIcon emoji="🎤" color={color} active={color === theme.primary} />,
+        }}
+      />
     </Tabs>
   );
 }
