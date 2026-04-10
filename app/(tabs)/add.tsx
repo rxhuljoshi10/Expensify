@@ -9,6 +9,8 @@ import CategoryPicker from '../../components/CategoryPicker';
 import { rupeesToPaise } from '../../lib/currency';
 import { Category } from '../../types/expense';
 import { useTheme, Theme } from '../../lib/theme';
+import { useEffect, useRef } from 'react';
+import { categorizeExpense } from '../../lib/ai';
 
 export default function AddExpenseScreen() {
     const theme = useTheme();
@@ -23,6 +25,8 @@ export default function AddExpenseScreen() {
     const [date, setDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [errors, setErrors] = useState<{ amount?: string; merchant?: string }>({});
+    const [isCategorizing, setIsCategorizing] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     const validate = (): boolean => {
         const newErrors: typeof errors = {};
@@ -43,10 +47,33 @@ export default function AddExpenseScreen() {
             description: description.trim(),
             expense_date: date.toISOString().split('T')[0],
         }, {
-            onSuccess: () => { toast.success('Expense added'); router.back(); },
+            onSuccess: () => {
+                toast.success('Expense added');
+                setAmount('');
+                setMerchant('');
+                setDescription('');
+                setCategory('Food');
+                setDate(new Date());
+                setErrors({});
+                router.back();
+            },
             onError: (e) => { toast.error(e.message); },
         });
     };
+
+    useEffect(() => {
+        if (!merchant.trim() || merchant.trim().length < 3) return;
+
+        clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(async () => {
+            setIsCategorizing(true);
+            const suggested = await categorizeExpense(merchant, description);
+            setCategory(suggested as Category);
+            setIsCategorizing(false);
+        }, 600);
+
+        return () => clearTimeout(debounceRef.current);
+    }, [merchant]);
 
     return (
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -75,7 +102,12 @@ export default function AddExpenseScreen() {
                 />
                 {errors.merchant && <Text style={styles.errorText}>{errors.merchant}</Text>}
 
-                <Text style={styles.label}>Category</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.label}>Category</Text>
+                    {isCategorizing && (
+                        <Text style={{ fontSize: 12, color: '#6C63FF' }}>AI suggesting...</Text>
+                    )}
+                </View>
                 <CategoryPicker selected={category} onSelect={setCategory} />
 
                 <Text style={styles.label}>Date</Text>

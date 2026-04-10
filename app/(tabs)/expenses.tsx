@@ -90,7 +90,7 @@ export default function ExpensesScreen() {
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background },
+    container: { flex: 1, backgroundColor: theme.background, paddingTop: 16 },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     searchBox: { padding: 16, paddingBottom: 8 },
     searchInput: {
