@@ -1,12 +1,14 @@
 // lib/ai.ts
 import { supabase } from './supabase';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export const parseVoiceExpense = async (audioUri: string): Promise<{
   amount: number;
   merchant: string;
   category: string;
   transcript: string;
-} | null> => {
+  } | null> => {
   try {
     const today = new Date().toISOString().split('T')[0];
 
@@ -47,5 +49,60 @@ export const categorizeExpense = async (
     return data.category ?? 'Other';
   } catch {
     return 'Other';  // always fall back silently
+  }
+};
+
+
+export const pickAndScanBill = async (): Promise<{
+  merchant: string;
+  total: number | null;
+  date: string | null;
+  category: string;
+  items: string[];
+  confidence: 'high' | 'medium' | 'low';
+  ocrText: string;
+} | null> => {
+  try {
+    // Ask user: camera or gallery
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,    // start with full quality — we compress below
+      allowsEditing: true,
+      aspect: [3, 4],  // portrait crop — most receipts are tall
+    });
+
+    if (result.canceled) return null;
+
+    // Compress to ~600KB — enough for Vision to read clearly
+    // Google Vision works better with slightly higher quality than Claude Vision
+    const compressed = await ImageManipulator.manipulateAsync(
+      result.assets[0].uri,
+      [{ resize: { width: 1500 } }],
+      {
+        compress: 0.85,
+        format: ImageManipulator.SaveFormat.JPEG,
+        base64: true,
+      }
+    );
+
+    if (!compressed.base64) throw new Error('Failed to compress image');
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabase.functions.invoke('scan-bill', {
+      body: {
+        imageBase64: compressed.base64,
+        today,
+      },
+    });
+
+    if (error) throw error;
+    if (data.error) throw new Error(data.error);
+
+    return data;
+
+  } catch (e: any) {
+    console.log('Bill scan error:', e.message);
+    return null;
   }
 };

@@ -14,6 +14,7 @@ import { useBudget } from '../../hooks/useBudget';
 import BudgetCard from '../../components/BudgetCard';
 import DashboardSkeleton from '../../components/DashboardSkeleton';
 import { useTheme, Theme } from '../../lib/theme';
+import InsightCard from '../../components/InsightCard';
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -67,6 +68,8 @@ export default function HomeScreen() {
             </Text>
           </View>
         </View>
+
+        <InsightCard />
 
         <View style={styles.statsRow}>
           <StatCard label="Today" amount={todayTotal} highlight={period === 'today'} onPress={() => setPeriod('today')} />

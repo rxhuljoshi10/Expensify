@@ -31,7 +31,14 @@
       "expo-router",
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Spendly needs camera access to scan bills and receipts.",
+          "photosPermission": "Spendly needs photo access to scan bills from your gallery."
+        }
+      ]
     ]
   }
 }

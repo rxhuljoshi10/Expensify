@@ -61,6 +61,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <TabIcon emoji="🎤" color={color} active={color === theme.primary} />,
         }}
       />
+      <Tabs.Screen
+        name="assistant"
+        options={{
+          title: 'Assistant',
+          tabBarIcon: ({ color }) => <TabIcon emoji="🤖" color={color} active={color === theme.primary} />,
+        }}
+      />
     </Tabs>
   );
 }
