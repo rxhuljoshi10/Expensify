@@ -3,8 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { Expense, CreateExpenseInput } from '../types/expense';
+import { useEffect } from 'react';
+import { useFamilyGroup } from './useFamilyGroup';
 
 const QUERY_KEY = ['expenses'];
+const GROUP_QUERY_KEY = ['group-expenses'];
 
 // ── Fetch all expenses for the current user ──────────────────────────
 export const useExpenses = () => {
@@ -115,4 +118,72 @@ export const useDeleteExpense = () => {
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
     });
+};
+
+export const useGroupExpenses = () => {
+  const { user } = useAuthStore();
+  const { data: group } = useFamilyGroup();
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: GROUP_QUERY_KEY,
+    queryFn: async (): Promise<(Expense & { member_name: string })[]> => {
+      if (!group) return [];
+
+      // Get all member IDs including owner
+      const memberIds = [
+        group.owner_id,
+        ...(group.members?.map(m => m.user_id) ?? []),
+      ];
+
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*, users(name, email)')
+        .in('user_id', memberIds)
+        .order('expense_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data ?? []).map(e => ({
+        ...e,
+        member_name: (e.users as any)?.name ?? (e.users as any)?.email ?? 'Unknown',
+      }));
+    },
+    enabled: !!user && !!group,
+  });
+
+  // ── Realtime subscription ─────────────────────────────────────────
+  useEffect(() => {
+    if (!group) return;
+
+    const memberIds = [
+      group.owner_id,
+      ...(group.members?.map(m => m.user_id) ?? []),
+    ];
+
+    const channel = supabase
+      .channel(`group-expenses-${group.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',           // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'expenses',
+          filter: `user_id=in.(${memberIds.join(',')})`,
+        },
+        (payload) => {
+          console.log('Realtime event:', payload.eventType);
+          // Invalidate and refetch group expenses on any change
+          queryClient.invalidateQueries({ queryKey: GROUP_QUERY_KEY });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [group?.id]);
+
+  return query;
 };

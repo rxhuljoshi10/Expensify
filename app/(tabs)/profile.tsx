@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useRouter } from 'expo-router';
 import { useFamilyGroup } from '../../hooks/useFamilyGroup';
 
+
 export default function ProfileScreen() {
   const { user, signOut } = useAuthStore();
   const router = useRouter();
@@ -41,6 +42,17 @@ export default function ProfileScreen() {
         </Text>
         <Text style={styles.menuArrow}>›</Text>
       </TouchableOpacity>
+
+      {group && (
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push('/family-dashboard')}
+        >
+          <Text style={styles.menuIcon}>📊</Text>
+          <Text style={styles.menuText}>Family dashboard</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

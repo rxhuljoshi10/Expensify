@@ -1,6 +1,6 @@
 // app/(tabs)/home.tsx
 import { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
 import { useDashboardStats, Period } from '../../hooks/useDashboardStats';
@@ -15,6 +15,8 @@ import BudgetCard from '../../components/BudgetCard';
 import DashboardSkeleton from '../../components/DashboardSkeleton';
 import { useTheme, Theme } from '../../lib/theme';
 import InsightCard from '../../components/InsightCard';
+import { useFamilyGroup } from '../../hooks/useFamilyGroup';
+import { useRouter } from 'expo-router';
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -24,6 +26,8 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { data: budget } = useBudget();
   const { isLoading } = useDashboardStats(period);
+  const { data: group } = useFamilyGroup();
+  const router = useRouter();
 
   const {
     todayTotal, weekTotal, monthTotal,
@@ -71,6 +75,20 @@ export default function HomeScreen() {
 
         <InsightCard />
 
+        {group && (
+          <View style={styles.viewToggle}>
+            <View style={styles.activeTab}>
+              <Text style={styles.activeTabText}>Personal</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.inactiveTab}
+              onPress={() => router.push('/family-dashboard')}
+            >
+              <Text style={styles.inactiveTabText}>👨‍👩‍👧 {group.name}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.statsRow}>
           <StatCard label="Today" amount={todayTotal} highlight={period === 'today'} onPress={() => setPeriod('today')} />
           <StatCard label="This week" amount={weekTotal} highlight={period === 'week'} onPress={() => setPeriod('week')} />
@@ -96,5 +114,16 @@ function createStyles(theme: Theme) {
     greeting: { fontSize: 22, fontWeight: '700', color: theme.text },
     date: { fontSize: 13, color: theme.textSecondary, marginTop: 4 },
     statsRow: { flexDirection: 'row', marginBottom: 20, marginHorizontal: -4 },
+    viewToggle: {
+      flexDirection: 'row', backgroundColor: '#f0f0f0',
+      borderRadius: 12, padding: 3, marginBottom: 16,
+    },
+    activeTab: {
+      flex: 1, backgroundColor: '#fff', borderRadius: 10,
+      paddingVertical: 8, alignItems: 'center',
+    },
+    activeTabText: { fontSize: 13, fontWeight: '700', color: '#6C63FF' },
+    inactiveTab: { flex: 1, paddingVertical: 8, alignItems: 'center' },
+    inactiveTabText: { fontSize: 13, color: '#888' },
   });
 }
