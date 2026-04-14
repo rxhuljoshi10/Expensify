@@ -2,10 +2,14 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { useRouter } from 'expo-router';
+import { useFamilyGroup } from '../../hooks/useFamilyGroup';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuthStore();
-  
+  const router = useRouter();
+  const { data: group } = useFamilyGroup();
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -17,14 +21,25 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Profile</Text>
-      
+
       <View style={styles.userInfoBox}>
         <Text style={styles.label}>Logged in as:</Text>
         <Text style={styles.email}>{user?.email}</Text>
       </View>
-      
+
       <TouchableOpacity style={styles.button} onPress={handleSignOut}>
         <Text style={styles.buttonText}>Sign Out</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.menuItem}
+        onPress={() => router.push('/family')}
+      >
+        <Text style={styles.menuIcon}>👨‍👩‍👧‍👦</Text>
+        <Text style={styles.menuText}>
+          {group ? `Family: ${group.name}` : 'Family group'}
+        </Text>
+        <Text style={styles.menuArrow}>›</Text>
       </TouchableOpacity>
     </View>
   );
@@ -79,4 +94,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 16, borderBottomWidth: 0.5, borderColor: '#f0f0f0', gap: 12,
+  },
+  menuIcon: { fontSize: 22 },
+  menuText: { flex: 1, fontSize: 16, color: '#1a1a1a' },
+  menuArrow: { fontSize: 20, color: '#ccc' },
 });

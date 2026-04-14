@@ -35,3 +35,24 @@ export interface Budget {
     alerted_80: boolean;
     alerted_100: boolean;
 }
+
+
+// types/expense.ts — add these
+export type GroupRole = 'owner' | 'member';
+
+export interface GroupMember {
+  user_id: string;
+  name: string;
+  email: string;
+  role: GroupRole;
+  joined_at: string;
+}
+
+export interface FamilyGroup {
+  id: string;
+  owner_id: string;
+  name: string;
+  invite_code: string;
+  members: GroupMember[];
+  created_at: string;
+}

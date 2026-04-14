@@ -64,7 +64,7 @@ User Question: ${question}`;
           parts: [{ text: prompt }]
         }],
         generationConfig: {
-          maxOutputTokens: 2048,
+          maxOutputTokens: 5048,
         }
       }),
     });
