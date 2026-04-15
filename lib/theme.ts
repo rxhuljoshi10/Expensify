@@ -11,6 +11,9 @@ export const lightTheme = {
     inputBg: '#fafafa',
     cardBg: '#ffffff',
     skeletonBg: '#e0e0e0',
+    separator: '#f0f0f0',
+    danger: '#ff4444',
+    success: '#28A745',
 };
 
 export const darkTheme = {
@@ -23,6 +26,9 @@ export const darkTheme = {
     inputBg: '#1c1c24',
     cardBg: '#1c1c24',
     skeletonBg: '#2a2a35',
+    separator: '#2a2a35',
+    danger: '#ff6b6b',
+    success: '#4ECDC4',
 };
 
 export type Theme = typeof lightTheme;

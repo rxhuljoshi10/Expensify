@@ -185,7 +185,7 @@ export const useGroupExpenses = () => {
     ];
 
     const channel = supabase
-      .channel(`group-expenses-${group.id}`)
+      .channel(`group-expenses-${group.id}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
