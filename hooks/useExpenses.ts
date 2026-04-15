@@ -138,17 +138,39 @@ export const useGroupExpenses = () => {
 
       const { data, error } = await supabase
         .from('expenses')
-        .select('*, users(name, email)')
+        .select('*')
         .in('user_id', memberIds)
         .order('expense_date', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      return (data ?? []).map(e => ({
-        ...e,
-        member_name: (e.users as any)?.name ?? (e.users as any)?.email ?? 'Unknown',
-      }));
+      return (data ?? []).map(e => {
+        const member = group.members?.find(m => m.user_id === e.user_id);
+        const isOwner = e.user_id === group.owner_id;
+        
+        let mName = member?.name;
+        
+        // robust fallback if name is an empty string
+        if (!mName || mName.trim() === '') {
+            if (member?.email) {
+                mName = member.email.split('@')[0];
+            } else if (isOwner) {
+                mName = group.name + ' Owner';
+            } else {
+                mName = 'Group Member';
+            }
+        }
+
+        if (e.user_id === user?.id) {
+            mName += ' (You)';
+        }
+
+        return {
+          ...e,
+          member_name: mName,
+        };
+      });
     },
     enabled: !!user && !!group,
   });

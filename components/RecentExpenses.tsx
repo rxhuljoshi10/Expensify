@@ -26,6 +26,7 @@ export default function RecentExpenses({ expenses }: Props) {
             ) : (
                 expenses.map(e => {
                     const cat = getCategoryMeta(e.category);
+                    const memberName = (e as any).member_name;
                     return (
                         <TouchableOpacity key={e.id} style={styles.row} onPress={() => router.push(`/edit-expense?id=${e.id}`)}>
                             <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
@@ -33,7 +34,15 @@ export default function RecentExpenses({ expenses }: Props) {
                             </View>
                             <View style={styles.info}>
                                 <Text style={styles.merchant} numberOfLines={1}>{e.merchant}</Text>
-                                <Text style={styles.category}>{e.category}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                    <Text style={styles.category}>{e.category}</Text>
+                                    {memberName && (
+                                        <>
+                                            <Text style={styles.dotSeparator}>•</Text>
+                                            <Text style={styles.memberBadge}>👤 {memberName}</Text>
+                                        </>
+                                    )}
+                                </View>
                             </View>
                             <Text style={styles.amount}>{formatAmount(e.amount)}</Text>
                         </TouchableOpacity>
@@ -56,7 +65,9 @@ function createStyles(theme: Theme) {
         icon: { fontSize: 18 },
         info: { flex: 1 },
         merchant: { fontSize: 14, fontWeight: '500', color: theme.text },
-        category: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+        category: { fontSize: 12, color: theme.textSecondary },
+        dotSeparator: { fontSize: 10, color: theme.textSecondary, marginHorizontal: 6, marginTop: 1 },
+        memberBadge: { fontSize: 11, fontWeight: '500', color: theme.primary, backgroundColor: theme.primary + '11', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
         amount: { fontSize: 14, fontWeight: '600', color: theme.text },
     });
 }

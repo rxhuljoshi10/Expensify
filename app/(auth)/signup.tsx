@@ -3,7 +3,11 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 
+import { useTheme, Theme } from '../../lib/theme';
+
 export default function SignUpScreen() {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,7 +53,7 @@ export default function SignUpScreen() {
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
-          placeholderTextColor="#888"
+          placeholderTextColor={theme.textSecondary}
         />
         <TextInput
           style={styles.input}
@@ -57,7 +61,7 @@ export default function SignUpScreen() {
           secureTextEntry
           value={password}
           onChangeText={setPassword}
-          placeholderTextColor="#888"
+          placeholderTextColor={theme.textSecondary}
         />
 
         <TouchableOpacity 
@@ -80,56 +84,59 @@ export default function SignUpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 48,
-  },
-  form: {
-    gap: 16,
-  },
-  input: {
-    height: 52,
-    borderWidth: 1,
-    borderColor: '#e1e1e1',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: '#fafafa',
-  },
-  button: {
-    height: 52,
-    backgroundColor: '#28A745',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backButton: {
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#666',
-    fontSize: 16,
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 24,
+      justifyContent: 'center',
+      backgroundColor: theme.background,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 18,
+      color: theme.textSecondary,
+      marginBottom: 48,
+    },
+    form: {
+      gap: 16,
+    },
+    input: {
+      height: 52,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      fontSize: 16,
+      color: theme.text,
+      backgroundColor: theme.separator,
+    },
+    button: {
+      height: 52,
+      backgroundColor: theme.success,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    buttonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    backButton: {
+      height: 52,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    backButtonText: {
+      color: theme.textSecondary,
+      fontSize: 16,
+    },
+  });
+}

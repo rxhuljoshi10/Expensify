@@ -16,7 +16,8 @@ import DashboardSkeleton from '../../components/DashboardSkeleton';
 import { useTheme, Theme } from '../../lib/theme';
 import InsightCard from '../../components/InsightCard';
 import { useFamilyGroup } from '../../hooks/useFamilyGroup';
-import { useRouter } from 'expo-router';
+import { useDashboardStore } from '../../store/dashboardStore';
+import MemberSpendingBar from '../../components/MemberSpendingBar';
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -25,14 +26,14 @@ export default function HomeScreen() {
   const [period, setPeriod] = useState<Period>('today');
   const [refreshing, setRefreshing] = useState(false);
   const { data: budget } = useBudget();
-  const { isLoading } = useDashboardStats(period);
   const { data: group } = useFamilyGroup();
-  const router = useRouter();
+  const { viewMode, setViewMode } = useDashboardStore();
 
   const {
-    todayTotal, weekTotal, monthTotal,
+    isLoading, todayTotal, weekTotal, monthTotal, periodTotal,
     byCategory, historicalWeeksData, recentExpenses,
     topCategory, averageDailySpend, largestExpense,
+    memberBreakdown
   } = useDashboardStats(period);
 
   const styles = createStyles(theme);
@@ -41,7 +42,10 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['expenses'] }),
+      queryClient.invalidateQueries({ queryKey: ['group-expenses'] }),
+    ]);
     setRefreshing(false);
   };
 
@@ -77,16 +81,27 @@ export default function HomeScreen() {
 
         {group && (
           <View style={styles.viewToggle}>
-            <View style={styles.activeTab}>
-              <Text style={styles.activeTabText}>Personal</Text>
-            </View>
             <TouchableOpacity
-              style={styles.inactiveTab}
-              onPress={() => router.push('/family-dashboard')}
+              style={viewMode === 'personal' ? styles.activeTab : styles.inactiveTab}
+              onPress={() => setViewMode('personal')}
             >
-              <Text style={styles.inactiveTabText}>👨‍👩‍👧 {group.name}</Text>
+              <Text style={viewMode === 'personal' ? styles.activeTabText : styles.inactiveTabText}>
+                Personal
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={viewMode === 'group' ? styles.activeTab : styles.inactiveTab}
+              onPress={() => setViewMode('group')}
+            >
+              <Text style={viewMode === 'group' ? styles.activeTabText : styles.inactiveTabText}>
+                👨‍👩‍👧 {group.name}
+              </Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        {viewMode === 'group' && (
+          <MemberSpendingBar members={memberBreakdown} periodTotal={periodTotal} />
         )}
 
         <View style={styles.statsRow}>
@@ -115,15 +130,15 @@ function createStyles(theme: Theme) {
     date: { fontSize: 13, color: theme.textSecondary, marginTop: 4 },
     statsRow: { flexDirection: 'row', marginBottom: 20, marginHorizontal: -4 },
     viewToggle: {
-      flexDirection: 'row', backgroundColor: '#f0f0f0',
+      flexDirection: 'row', backgroundColor: theme.separator,
       borderRadius: 12, padding: 3, marginBottom: 16,
     },
     activeTab: {
-      flex: 1, backgroundColor: '#fff', borderRadius: 10,
+      flex: 1, backgroundColor: theme.cardBg, borderRadius: 10,
       paddingVertical: 8, alignItems: 'center',
     },
-    activeTabText: { fontSize: 13, fontWeight: '700', color: '#6C63FF' },
+    activeTabText: { fontSize: 13, fontWeight: '700', color: theme.primary },
     inactiveTab: { flex: 1, paddingVertical: 8, alignItems: 'center' },
-    inactiveTabText: { fontSize: 13, color: '#888' },
+    inactiveTabText: { fontSize: 13, color: theme.textSecondary },
   });
 }

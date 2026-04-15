@@ -23,7 +23,15 @@ export default function ExpenseRow({ expense, onPress, onLongPress }: Props) {
             </View>
             <View style={styles.info}>
                 <Text style={styles.merchant} numberOfLines={1}>{expense.merchant}</Text>
-                <Text style={styles.category}>{expense.category}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                    <Text style={styles.category}>{expense.category}</Text>
+                    {(expense as any).member_name && (
+                        <>
+                            <Text style={styles.dotSeparator}>•</Text>
+                            <Text style={styles.memberBadge}>👤 {(expense as any).member_name}</Text>
+                        </>
+                    )}
+                </View>
             </View>
             <View style={styles.right}>
                 <Text style={styles.amount}>{formatAmount(expense.amount)}</Text>
@@ -46,7 +54,9 @@ function createStyles(theme: Theme) {
         icon: { fontSize: 20 },
         info: { flex: 1 },
         merchant: { fontSize: 15, fontWeight: '500', color: theme.text },
-        category: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+        category: { fontSize: 13, color: theme.textSecondary },
+        dotSeparator: { fontSize: 10, color: theme.textSecondary, marginHorizontal: 6, marginTop: 1 },
+        memberBadge: { fontSize: 11, fontWeight: '500', color: theme.primary, backgroundColor: theme.primary + '11', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
         right: { alignItems: 'flex-end' },
         amount: { fontSize: 15, fontWeight: '600', color: theme.text },
         date: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },

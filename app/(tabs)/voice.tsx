@@ -11,7 +11,11 @@ import { useAddExpense } from '../../hooks/useExpenses';
 import { rupeesToPaise } from '../../lib/currency';
 import { toast } from '../../lib/toast';
 
+import { useTheme, Theme } from '../../lib/theme';
+
 export default function VoiceScreen() {
+    const theme = useTheme();
+    const styles = createStyles(theme);
     const router = useRouter();
     const { state, startRecording, stopRecording, reset } = useVoiceRecorder();
     const { mutate: addExpense } = useAddExpense();
@@ -114,25 +118,27 @@ export default function VoiceScreen() {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1, backgroundColor: '#fff',
-        alignItems: 'center', justifyContent: 'center', padding: 32,
-    },
-    title: { fontSize: 24, fontWeight: '700', color: '#1a1a1a', marginBottom: 12 },
-    hint: {
-        fontSize: 15, color: '#888', textAlign: 'center',
-        lineHeight: 24, marginBottom: 60,
-    },
-    micButton: {
-        width: 120, height: 120, borderRadius: 60,
-        backgroundColor: '#f0f0ff', borderWidth: 3, borderColor: '#6C63FF',
-        alignItems: 'center', justifyContent: 'center', marginBottom: 32,
-    },
-    micButtonActive: { backgroundColor: '#6C63FF', borderColor: '#4a42cc' },
-    micButtonProcessing: { backgroundColor: '#f0f0f0', borderColor: '#ccc' },
-    micIcon: { fontSize: 44 },
-    statusText: { fontSize: 16, color: '#555', textAlign: 'center', marginBottom: 24 },
-    cancelButton: { padding: 12 },
-    cancelText: { fontSize: 15, color: '#ff4444' },
-});
+function createStyles(theme: Theme) {
+    return StyleSheet.create({
+        container: {
+            flex: 1, backgroundColor: theme.background,
+            alignItems: 'center', justifyContent: 'center', padding: 32,
+        },
+        title: { fontSize: 24, fontWeight: '700', color: theme.text, marginBottom: 12 },
+        hint: {
+            fontSize: 15, color: theme.textSecondary, textAlign: 'center',
+            lineHeight: 24, marginBottom: 60,
+        },
+        micButton: {
+            width: 120, height: 120, borderRadius: 60,
+            backgroundColor: theme.primary + '11', borderWidth: 3, borderColor: theme.primary,
+            alignItems: 'center', justifyContent: 'center', marginBottom: 32,
+        },
+        micButtonActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+        micButtonProcessing: { backgroundColor: theme.separator, borderColor: theme.border },
+        micIcon: { fontSize: 44 },
+        statusText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginBottom: 24 },
+        cancelButton: { padding: 12 },
+        cancelText: { fontSize: 15, color: theme.danger },
+    });
+}

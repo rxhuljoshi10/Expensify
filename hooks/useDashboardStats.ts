@@ -1,6 +1,7 @@
 // hooks/useDashboardStats.ts
 import { useMemo } from 'react';
-import { useExpenses } from './useExpenses';
+import { useExpenses, useGroupExpenses } from './useExpenses';
+import { useDashboardStore } from '../store/dashboardStore';
 import { Expense } from '../types/expense';
 import { CATEGORIES } from '../constants/categories';
 
@@ -51,7 +52,12 @@ export const useDashboardStats = (
     customFrom?: Date,
     customTo?: Date,
 ) => {
-    const { data: expenses = [], isLoading } = useExpenses();
+    const { viewMode } = useDashboardStore();
+    const { data: personalExpenses = [], isLoading: isPersonalLoading } = useExpenses();
+    const { data: groupExpenses = [], isLoading: isGroupLoading } = useGroupExpenses();
+
+    const expenses = viewMode === 'group' ? groupExpenses : personalExpenses;
+    const isLoading = viewMode === 'group' ? isGroupLoading : isPersonalLoading;
 
     return useMemo(() => {
         // Always compute today/week/month regardless of selected period
@@ -65,6 +71,20 @@ export const useDashboardStats = (
         // Filter for the selected period (used in charts)
         const periodExpenses = filterByPeriod(expenses, period, customFrom, customTo);
         const periodTotal = periodExpenses.reduce((s, e) => s + e.amount, 0);
+
+        // Member breakdown
+        const byMember: Record<string, { name: string; total: number; count: number }> = {};
+        if (viewMode === 'group') {
+            periodExpenses.forEach(e => {
+                const memberName = (e as any).member_name || 'Group Member';
+                if (!byMember[e.user_id]) {
+                    byMember[e.user_id] = { name: memberName, total: 0, count: 0 };
+                }
+                byMember[e.user_id].total += e.amount;
+                byMember[e.user_id].count += 1;
+            });
+        }
+        const memberBreakdown = Object.entries(byMember).map(([id, v]) => ({ id, ...v }));
 
         // Category breakdown for pie chart
         const byCategory = CATEGORIES.map(cat => {
@@ -154,11 +174,13 @@ export const useDashboardStats = (
 
         return {
             isLoading,
+            viewMode,
             todayTotal,
             weekTotal,
             monthTotal,
             periodTotal,
             periodExpenses,
+            memberBreakdown,
             byCategory,
             historicalWeeksData,
             recentExpenses,
@@ -166,5 +188,5 @@ export const useDashboardStats = (
             averageDailySpend,
             largestExpense,
         };
-    }, [expenses, period, customFrom, customTo]);
+    }, [expenses, period, customFrom, customTo, viewMode]);
 };

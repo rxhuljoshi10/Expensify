@@ -6,10 +6,14 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 
+import { useTheme, Theme } from '../../lib/theme';
+
 // Required for web browser flow
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
+  const theme = useTheme();
+  const styles = createStyles(theme);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -81,7 +85,7 @@ export default function LoginScreen() {
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
-          placeholderTextColor="#888"
+          placeholderTextColor={theme.textSecondary}
         />
         <TextInput
           style={styles.input}
@@ -89,7 +93,7 @@ export default function LoginScreen() {
           secureTextEntry
           value={password}
           onChangeText={setPassword}
-          placeholderTextColor="#888"
+          placeholderTextColor={theme.textSecondary}
         />
 
         <TouchableOpacity
@@ -127,88 +131,91 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 42,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 48,
-  },
-  form: {
-    gap: 16,
-  },
-  input: {
-    height: 52,
-    borderWidth: 1,
-    borderColor: '#e1e1e1',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    backgroundColor: '#fafafa',
-  },
-  button: {
-    height: 52,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  googleButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d1d1d1',
-    marginTop: 0,
-  },
-  googleButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e1e1e1',
-  },
-  dividerText: {
-    color: '#888',
-    paddingHorizontal: 16,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  footerText: {
-    color: '#666',
-    fontSize: 15,
-  },
-  linkText: {
-    color: '#007AFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-});
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: 24,
+      justifyContent: 'center',
+      backgroundColor: theme.background,
+    },
+    title: {
+      fontSize: 42,
+      fontWeight: 'bold',
+      color: theme.text,
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 18,
+      color: theme.textSecondary,
+      marginBottom: 48,
+    },
+    form: {
+      gap: 16,
+    },
+    input: {
+      height: 52,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      fontSize: 16,
+      color: theme.text,
+      backgroundColor: theme.separator,
+    },
+    button: {
+      height: 52,
+      backgroundColor: theme.primary,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    buttonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    googleButton: {
+      backgroundColor: theme.cardBg,
+      borderWidth: 1,
+      borderColor: theme.border,
+      marginTop: 0,
+    },
+    googleButtonText: {
+      color: theme.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    dividerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 16,
+    },
+    divider: {
+      flex: 1,
+      height: 1,
+      backgroundColor: theme.separator,
+    },
+    dividerText: {
+      color: theme.textSecondary,
+      paddingHorizontal: 16,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      marginTop: 24,
+    },
+    footerText: {
+      color: theme.textSecondary,
+      fontSize: 15,
+    },
+    linkText: {
+      color: theme.primary,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+  });
+}
