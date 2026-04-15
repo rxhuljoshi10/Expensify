@@ -1,7 +1,7 @@
-// app/(tabs)/home.tsx
 import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useAuthStore } from '../../store/authStore';
 import { useDashboardStats, Period } from '../../hooks/useDashboardStats';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +18,7 @@ import InsightCard from '../../components/InsightCard';
 import { useFamilyGroup } from '../../hooks/useFamilyGroup';
 import { useDashboardStore } from '../../store/dashboardStore';
 import MemberSpendingBar from '../../components/MemberSpendingBar';
+import { useRecurring } from '../../hooks/useRecurring';
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -28,6 +29,11 @@ export default function HomeScreen() {
   const { data: budget } = useBudget();
   const { data: group } = useFamilyGroup();
   const { viewMode, setViewMode } = useDashboardStore();
+  const { data: recurring = [] } = useRecurring();
+
+  const dueTodayCount = recurring.filter(r => {
+    return r.is_active && r.next_due_date === new Date().toISOString().split('T')[0];
+  }).length;
 
   const {
     isLoading, todayTotal, weekTotal, monthTotal, periodTotal,
@@ -113,6 +119,17 @@ export default function HomeScreen() {
         <SpendingPieChart data={byCategory} />
         <DailyBarChart historicalWeeksData={historicalWeeksData} />
         <BudgetCard budget={budget ?? null} spentPaise={monthTotal} />
+        {dueTodayCount > 0 && (
+          <TouchableOpacity
+            style={styles.recurringNudge}
+            onPress={() => router.push('/recurring')}
+          >
+            <Text style={styles.recurringNudgeText}>
+              🔄 {dueTodayCount} recurring expense{dueTodayCount > 1 ? 's' : ''} due today
+            </Text>
+            <Text style={styles.recurringNudgeArrow}>›</Text>
+          </TouchableOpacity>
+        )}
         <DashboardInsights topCategory={topCategory} averageDailySpend={averageDailySpend} largestExpense={largestExpense} />
         <RecentExpenses expenses={recentExpenses} />
       </ScrollView>
@@ -140,5 +157,13 @@ function createStyles(theme: Theme) {
     activeTabText: { fontSize: 13, fontWeight: '700', color: theme.primary },
     inactiveTab: { flex: 1, paddingVertical: 8, alignItems: 'center' },
     inactiveTabText: { fontSize: 13, color: theme.textSecondary },
+    recurringNudge: {
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: '#fff8e1', borderRadius: 12,
+      padding: 14, marginBottom: 16,
+      borderLeftWidth: 3, borderLeftColor: '#FF9500',
+    },
+    recurringNudgeText: { flex: 1, fontSize: 14, color: '#FF9500', fontWeight: '500' },
+    recurringNudgeArrow: { fontSize: 18, color: '#FF9500' },
   });
 }

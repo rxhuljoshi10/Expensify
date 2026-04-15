@@ -56,3 +56,26 @@ export interface FamilyGroup {
   members: GroupMember[];
   created_at: string;
 }
+
+
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface RecurringExpense {
+  id: string;
+  user_id: string;
+  amount: number;        // in paise
+  merchant: string;
+  category: Category;
+  frequency: RecurringFrequency;
+  next_due_date: string; // 'YYYY-MM-DD'
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CreateRecurringInput {
+  amount: number;
+  merchant: string;
+  category: Category;
+  frequency: RecurringFrequency;
+  next_due_date: string;
+}

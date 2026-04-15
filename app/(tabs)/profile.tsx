@@ -44,6 +44,15 @@ export default function ProfileScreen() {
         </Text>
         <Text style={styles.menuArrow}>›</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.menuItem}
+        onPress={() => router.push('/recurring')}
+      >
+        <Text style={styles.menuIcon}>🔄</Text>
+        <Text style={styles.menuText}>Recurring expenses</Text>
+        <Text style={styles.menuArrow}>›</Text>
+      </TouchableOpacity>
     </View>
   );
 }
