@@ -24,7 +24,7 @@ function CompactExpenseRow({ expense, theme }: { expense: any; theme: Theme }) {
                 backgroundColor: cat.color + '22',
                 alignItems: 'center', justifyContent: 'center', marginRight: 10,
             }}>
-                <Text style={{ fontSize: 14 }}>{cat.icon}</Text>
+                <Ionicons name={cat.icon as any} size={16} color={cat.color} />
             </View>
             <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: '500', color: theme.text }} numberOfLines={1}>{expense.merchant}</Text>

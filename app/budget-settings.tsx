@@ -7,6 +7,7 @@ import { useBudget, useSetBudget } from '../hooks/useBudget';
 import { CATEGORIES } from '../constants/categories';
 import { rupeesToPaise } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function BudgetSettingsScreen() {
     const theme = useTheme();
@@ -62,7 +63,7 @@ export default function BudgetSettingsScreen() {
 
                 {CATEGORIES.map(cat => (
                     <View key={cat.name} style={styles.categoryRow}>
-                        <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                        <Ionicons name={cat.icon as any} size={20} color={cat.color} />
                         <Text style={styles.categoryName}>{cat.name}</Text>
                         <TextInput
                             style={styles.categoryInput}

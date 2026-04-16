@@ -4,6 +4,7 @@ import { Expense } from '../types/expense';
 import { getCategoryMeta } from '../constants/categories';
 import { formatAmount } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Props {
     expense: Expense;
@@ -19,7 +20,7 @@ export default function ExpenseRow({ expense, onPress, onLongPress }: Props) {
     return (
         <TouchableOpacity style={styles.row} onPress={onPress} onLongPress={onLongPress}>
             <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
-                <Text style={styles.icon}>{cat.icon}</Text>
+                <Ionicons name={cat.icon as any} size={20} color={cat.color} />
             </View>
             <View style={styles.info}>
                 <Text style={styles.merchant} numberOfLines={1}>{expense.merchant}</Text>

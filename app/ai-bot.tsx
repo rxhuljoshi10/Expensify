@@ -101,7 +101,7 @@ export default function AIBotScreen() {
                     contentContainerStyle={styles.messageList}
                     ListEmptyComponent={
                         <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyIcon}>🤖</Text>
+                            <Ionicons name="chatbubbles" size={56} color={theme.primary} style={{ marginBottom: 12, opacity: 0.8 }} />
                             <Text style={styles.emptyText}>Ask me anything about your expenses</Text>
                             <View style={styles.suggestions}>
                                 {SUGGESTIONS.map(s => (

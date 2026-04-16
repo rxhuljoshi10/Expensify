@@ -10,7 +10,7 @@ import { parseVoiceExpense } from '../../lib/ai';
 import { useAddExpense } from '../../hooks/useExpenses';
 import { rupeesToPaise } from '../../lib/currency';
 import { toast } from '../../lib/toast';
-
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme, Theme } from '../../lib/theme';
 
 export default function VoiceScreen() {
@@ -101,9 +101,12 @@ export default function VoiceScreen() {
                     onPress={handleMicPress}
                     disabled={isProcessing}
                 >
-                    <Text style={styles.micIcon}>
-                        {state === 'recording' ? '⏹' : state === 'processing' ? '⏳' : '🎤'}
-                    </Text>
+                    {state === 'recording' 
+                        ? <Ionicons name="stop" size={44} color="#fff" />
+                        : state === 'processing' 
+                            ? <Ionicons name="hourglass" size={44} color={theme.textSecondary} />
+                            : <Ionicons name="mic" size={44} color={theme.primary} />
+                    }
                 </TouchableOpacity>
             </Animated.View>
 

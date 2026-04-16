@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { CATEGORIES } from '../constants/categories';
 import { Category } from '../types/expense';
 import { useTheme, Theme } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Props { selected: Category; onSelect: (c: Category) => void; }
 
@@ -18,7 +19,7 @@ export default function CategoryPicker({ selected, onSelect }: Props) {
                     style={[styles.chip, selected === cat.name && { backgroundColor: cat.color, borderColor: cat.color }]}
                     onPress={() => onSelect(cat.name)}
                 >
-                    <Text style={styles.icon}>{cat.icon}</Text>
+                    <Ionicons name={cat.icon as any} size={16} color={selected === cat.name ? '#fff' : cat.color} />
                     <Text style={[styles.label, selected === cat.name && styles.labelSelected]}>{cat.name}</Text>
                 </TouchableOpacity>
             ))}

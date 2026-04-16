@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { formatAmount } from '../lib/currency';
 import { Expense } from '../types/expense';
 import { useTheme, Theme } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Props {
     topCategory: { name: string; total: number; icon: string; color: string } | null;
@@ -20,14 +21,18 @@ export default function DashboardInsights({ topCategory, averageDailySpend, larg
             <View style={styles.row}>
                 <View style={[styles.insightCard, { marginRight: 8 }]}>
                     <View style={styles.iconBox}>
-                        <Text style={styles.icon}>📊</Text>
+                        <Ionicons name="stats-chart" size={18} color={theme.primary} />
                     </View>
                     <Text style={styles.label}>Daily Average</Text>
                     <Text style={styles.value}>{formatAmount(averageDailySpend)}</Text>
                 </View>
                 <View style={[styles.insightCard, { marginLeft: 8 }]}>
                     <View style={[styles.iconBox, { backgroundColor: topCategory?.color ? `${topCategory.color}20` : theme.border }]}>
-                        <Text style={styles.icon}>{topCategory?.icon || '?'}</Text>
+                        <Ionicons 
+                            name={(topCategory?.icon as any) || 'help-circle'} 
+                            size={18} 
+                            color={topCategory?.color || theme.textSecondary} 
+                        />
                     </View>
                     <Text style={styles.label}>Highest Drain</Text>
                     <Text style={styles.value}>{topCategory?.name || 'N/A'}</Text>

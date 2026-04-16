@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { formatAmount } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Props {
     data: { name: string; total: number; color: string; icon: string }[];
@@ -86,7 +87,7 @@ export default function SpendingPieChart({ data }: Props) {
                         <View key={item.name} style={styles.legendItem}>
                             <View style={styles.legendLeft}>
                                 <View style={[styles.iconBox, { backgroundColor: `${item.color}20` }]}>
-                                    <Text style={styles.legendIcon}>{item.icon}</Text>
+                                    <Ionicons name={item.icon as any} size={16} color={item.color} />
                                 </View>
                                 <Text style={styles.legendLabel} numberOfLines={1}>{item.name}</Text>
                             </View>

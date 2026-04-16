@@ -12,6 +12,7 @@ import { formatAmount } from '../lib/currency';
 import { RecurringExpense, RecurringFrequency } from '../types/expense';
 import { toast } from '../lib/toast';
 import { useTheme, Theme } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 const frequencyLabel: Record<RecurringFrequency, string> = {
     daily: 'Every day',
@@ -112,7 +113,7 @@ export default function RecurringScreen() {
                                 {/* Top row */}
                                 <View style={styles.cardTop}>
                                     <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
-                                        <Text style={styles.icon}>{cat.icon}</Text>
+                                        <Ionicons name={cat.icon as any} size={20} color={cat.color} />
                                     </View>
                                     <View style={styles.info}>
                                         <Text style={[styles.merchant, !item.is_active && styles.textMuted]}>
