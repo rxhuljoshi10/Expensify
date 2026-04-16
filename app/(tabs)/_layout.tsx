@@ -64,8 +64,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="assistant"
         options={{
-          title: 'Assistant',
-          tabBarIcon: ({ color }) => <TabIcon emoji="🤖" color={color} active={color === theme.primary} />,
+          title: 'AI Insights',
+          tabBarIcon: ({ color }) => <TabIcon emoji="💡" color={color} active={color === theme.primary} />,
         }}
       />
     </Tabs>

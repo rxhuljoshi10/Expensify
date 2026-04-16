@@ -1,6 +1,6 @@
-// components/InsightCard.tsx
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useTheme, Theme } from '../lib/theme';
@@ -14,6 +14,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 export default function InsightCard() {
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
+    const router = useRouter();
     const theme = useTheme();
     const styles = createStyles(theme);
 
@@ -24,7 +25,7 @@ export default function InsightCard() {
                 .from('insights')
                 .select('*')
                 .eq('user_id', user!.id)
-                .eq('type', 'monthly_summary')
+                .eq('is_read', false)
                 .order('generated_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
@@ -43,30 +44,36 @@ export default function InsightCard() {
         onSettled: () => queryClient.invalidateQueries({ queryKey: ['insight'] }),
     });
 
-    if (!insight) return null;
+    if (!insight || insight.is_read) return null;
 
     return (
-        <View style={[styles.card, insight.is_read && styles.cardRead]}>
+        <View style={styles.card}>
             <View style={styles.header}>
                 <View style={styles.headerLeft}>
                     <Ionicons name="sparkles" size={18} color={theme.primary} />
                     <Text style={styles.label}>AI Insight</Text>
-                    {!insight.is_read && (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>NEW</Text>
-                        </View>
-                    )}
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>NEW</Text>
+                    </View>
                 </View>
-                {!insight.is_read && (
-                    <TouchableOpacity 
-                        onPress={() => markRead(insight.id)} 
-                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    >
-                        <Ionicons name="close" size={20} color={theme.textSecondary} />
-                    </TouchableOpacity>
-                )}
+                <TouchableOpacity 
+                    onPress={() => markRead(insight.id)} 
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    style={styles.closeBtn}
+                >
+                    <Ionicons name="close" size={20} color={theme.textSecondary} />
+                </TouchableOpacity>
             </View>
-            <Text style={styles.content}>{insight.content}</Text>
+            <TouchableOpacity 
+                activeOpacity={0.7} 
+                onPress={() => router.push('/(tabs)/assistant')}
+            >
+                <Text style={styles.content}>{insight.content}</Text>
+                <View style={styles.readMoreRow}>
+                    <Text style={styles.readMoreText}>Read more to view all insights</Text>
+                    <Ionicons name="arrow-forward" size={14} color={theme.primary} />
+                </View>
+            </TouchableOpacity>
         </View>
     );
 }
@@ -86,12 +93,6 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 8,
         elevation: 3,
-    },
-    cardRead: { 
-        opacity: 0.6,
-        shadowOpacity: 0,
-        elevation: 0,
-        borderLeftColor: theme.border, 
     },
     header: { 
         flexDirection: 'row', 
@@ -123,10 +124,26 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         fontWeight: '800',
         letterSpacing: 0.5,
     },
+    closeBtn: {
+        backgroundColor: theme.background,
+        borderRadius: 12,
+        padding: 4,
+    },
     content: { 
         fontSize: 15, 
         color: theme.text, 
         lineHeight: 24,
         fontWeight: '500',
     },
+    readMoreRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+        gap: 4
+    },
+    readMoreText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: theme.primary,
+    }
 });
