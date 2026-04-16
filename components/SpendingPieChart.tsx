@@ -1,5 +1,6 @@
 // components/SpendingPieChart.tsx
-import { View, Text, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { formatAmount } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
@@ -11,6 +12,7 @@ interface Props {
 export default function SpendingPieChart({ data }: Props) {
     const theme = useTheme();
     const styles = createStyles(theme);
+    const [expanded, setExpanded] = useState(false);
 
     if (data.length === 0) {
         return (
@@ -24,6 +26,13 @@ export default function SpendingPieChart({ data }: Props) {
     }
 
     const total = data.reduce((s, d) => s + d.total, 0);
+
+    // Sort data from highest to lowest
+    const sortedData = [...data]
+        .filter(d => d.total > 0)
+        .sort((a, b) => b.total - a.total);
+
+    const displayData = expanded ? sortedData : sortedData.slice(0, 3);
 
     const size = 200;
     const strokeWidth = 28;
@@ -39,9 +48,7 @@ export default function SpendingPieChart({ data }: Props) {
                 <View style={styles.donutContainer}>
                     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
                         <G rotation="-90" origin={`${center}, ${center}`}>
-                            {data.map((slice, index) => {
-                                if (slice.total === 0) return null;
-
+                            {sortedData.map((slice, index) => {
                                 const angle = (slice.total / total) * 360;
                                 const startAngle = currentAngle;
                                 const endAngle = currentAngle + angle;
@@ -73,7 +80,7 @@ export default function SpendingPieChart({ data }: Props) {
             </View>
 
             <View style={styles.legend}>
-                {data.map(item => {
+                {displayData.map(item => {
                     const percentage = Math.round((item.total / total) * 100);
                     return (
                         <View key={item.name} style={styles.legendItem}>
@@ -91,6 +98,18 @@ export default function SpendingPieChart({ data }: Props) {
                     );
                 })}
             </View>
+
+            {sortedData.length > 3 && (
+                <TouchableOpacity 
+                    style={styles.seeMoreButton} 
+                    onPress={() => setExpanded(!expanded)}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.seeMoreText}>
+                        {expanded ? 'See less' : `See all categories (${sortedData.length})`}
+                    </Text>
+                </TouchableOpacity>
+            )}
         </View>
     );
 }
@@ -120,5 +139,18 @@ function createStyles(theme: Theme) {
         legendRight: { alignItems: 'flex-end' },
         legendAmount: { fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: 2 },
         legendPercent: { fontSize: 12, fontWeight: '700' },
+        seeMoreButton: {
+            marginTop: 16,
+            paddingTop: 16,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderTopWidth: 1,
+            borderColor: theme.border,
+        },
+        seeMoreText: {
+            color: theme.primary,
+            fontSize: 14,
+            fontWeight: '600',
+        }
     });
 }

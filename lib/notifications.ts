@@ -5,15 +5,15 @@ import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 // Configure how notifications appear when app is in foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Notifications.setNotificationHandler({
+//   handleNotification: async () => ({
+//     shouldShowAlert: true,
+//     shouldPlaySound: true,
+//     shouldSetBadge: true,
+//     shouldShowBanner: true,
+//     shouldShowList: true,
+//   }),
+// });
 
 export const registerForPushNotifications = async (
   userId: string

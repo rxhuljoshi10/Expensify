@@ -102,17 +102,19 @@ export const useDashboardStats = (
             const dateInWeek = new Date(now);
             dateInWeek.setDate(now.getDate() - w * 7);
             
-            // strictly find Sunday
-            const sunday = new Date(dateInWeek);
-            sunday.setDate(dateInWeek.getDate() - dateInWeek.getDay());
-            sunday.setHours(0,0,0,0);
+            // strictly find Monday
+            const monday = new Date(dateInWeek);
+            const dayOfW = dateInWeek.getDay();
+            const diffToMon = dayOfW === 0 ? -6 : 1 - dayOfW;
+            monday.setDate(dateInWeek.getDate() + diffToMon);
+            monday.setHours(0,0,0,0);
             
             const days = [];
             let weeklyTotalAmount = 0;
             
             for (let d = 0; d < 7; d++) {
-                const currentDay = new Date(sunday);
-                currentDay.setDate(sunday.getDate() + d);
+                const currentDay = new Date(monday);
+                currentDay.setDate(monday.getDate() + d);
                 // Adjust to local ISO equivalent without timezone shifting issues:
                 const tzOffset = currentDay.getTimezoneOffset() * 60000;
                 const localISOTime = (new Date(currentDay.getTime() - tzOffset)).toISOString().slice(0, 10);
@@ -131,15 +133,16 @@ export const useDashboardStats = (
                 days.push({
                     date: dateStr,
                     total: isFuture ? -1 : total, // -1 signals future/blank
-                    label: currentDay.toLocaleDateString('en-IN', { weekday: 'short' })
+                    label: currentDay.toLocaleDateString('en-IN', { weekday: 'short' }),
+                    expenses: dayExpenses.sort((a, b) => b.amount - a.amount),
                 });
             }
             
-            const saturday = new Date(sunday);
-            saturday.setDate(sunday.getDate() + 6);
+            const sundayOfThisWeek = new Date(monday);
+            sundayOfThisWeek.setDate(monday.getDate() + 6);
             
             const formatDate = (date: Date) => date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
-            let weekLabel = `${formatDate(sunday)} - ${formatDate(saturday)}`;
+            let weekLabel = `${formatDate(monday)} - ${formatDate(sundayOfThisWeek)}`;
             if (w === 0) weekLabel = "This Week";
             if (w === 1) weekLabel = "Last Week";
             

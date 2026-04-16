@@ -106,15 +106,15 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {viewMode === 'group' && (
-          <MemberSpendingBar members={memberBreakdown} periodTotal={periodTotal} />
-        )}
-
         <View style={styles.statsRow}>
           <StatCard label="Today" amount={todayTotal} highlight={period === 'today'} onPress={() => setPeriod('today')} />
           <StatCard label="This week" amount={weekTotal} highlight={period === 'week'} onPress={() => setPeriod('week')} />
           <StatCard label="This month" amount={monthTotal} highlight={period === 'month'} onPress={() => setPeriod('month')} />
         </View>
+
+        {viewMode === 'group' && (
+          <MemberSpendingBar members={memberBreakdown} periodTotal={periodTotal} />
+        )}
 
         <SpendingPieChart data={byCategory} />
         <DailyBarChart historicalWeeksData={historicalWeeksData} />
@@ -131,7 +131,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
         <DashboardInsights topCategory={topCategory} averageDailySpend={averageDailySpend} largestExpense={largestExpense} />
-        <RecentExpenses expenses={recentExpenses} />
+        {/* <RecentExpenses expenses={recentExpenses} /> */}
       </ScrollView>
     </SafeAreaView>
   );

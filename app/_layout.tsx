@@ -81,7 +81,7 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGuard />
-      <NotificationHandler />
+      {/* <NotificationHandler /> */}
       <OfflineBanner />
       <Toast />
     </QueryClientProvider>

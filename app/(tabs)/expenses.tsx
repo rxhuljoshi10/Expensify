@@ -15,7 +15,7 @@ export default function ExpensesScreen() {
   const theme = useTheme();
   const styles = createStyles(theme);
   const router = useRouter();
-  
+
   const { viewMode, setViewMode } = useDashboardStore();
   const { data: group } = useFamilyGroup();
   const { data: personalExpenses = [], isLoading: isPersonalLoading } = useExpenses();
@@ -46,7 +46,7 @@ export default function ExpensesScreen() {
 
   return (
     <View style={styles.container}>
-      
+
       {group && (
         <View style={styles.viewTogglePadding}>
           <View style={styles.viewToggle}>
@@ -125,7 +125,7 @@ function createStyles(theme: Theme) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background, paddingTop: 16 },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    searchBox: { padding: 16, paddingBottom: 8 },
+    searchBox: { padding: 10 },
     searchInput: {
       backgroundColor: theme.inputBg, borderRadius: 12,
       padding: 12, fontSize: 15, color: theme.text,
@@ -144,7 +144,7 @@ function createStyles(theme: Theme) {
     emptyText: { fontSize: 18, fontWeight: '600', color: theme.text },
     emptySubtext: { fontSize: 14, color: theme.textSecondary, marginTop: 4 },
     viewTogglePadding: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 10,
       paddingTop: 8,
     },
     viewToggle: {
