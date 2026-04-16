@@ -14,7 +14,13 @@
       "backgroundColor": "#6C63FF"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "package": "com.package.expensify",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -35,8 +41,16 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Spendly needs camera access to scan bills and receipts.",
-          "photosPermission": "Spendly needs photo access to scan bills from your gallery."
+          "cameraPermission": "Expensify needs camera access to scan bills and receipts.",
+          "photosPermission": "Expensify needs photo access to scan bills from your gallery."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6C63FF",
+          "sounds": []
         }
       ]
     ]

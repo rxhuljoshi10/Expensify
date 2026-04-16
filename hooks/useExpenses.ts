@@ -43,6 +43,12 @@ export const useAddExpense = () => {
                 .select()
                 .single();
             if (error) throw error;
+
+            // Fire budget check in background — don't await
+            supabase.functions.invoke('send-notifications', {
+                body: { type: 'budget', userId: user!.id },
+            }).catch(console.error);
+
             return data;
         },
         // Optimistic update — item appears instantly before server confirms

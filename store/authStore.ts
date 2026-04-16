@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { registerForPushNotifications } from '../lib/notifications';
 
 interface AuthState {
     user: User | null;
@@ -33,6 +34,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         // Listen for auth changes (login, logout, token refresh)
         supabase.auth.onAuthStateChange(async (_event, session) => {
             set({ session, user: session?.user ?? null, isLoading: false });
+            
+            if (_event === 'SIGNED_IN' && session?.user) {
+                // Register push token in background — don't await
+                registerForPushNotifications(session.user.id).catch(console.error);
+            }
         });
     },
 }));
