@@ -18,7 +18,7 @@ export default function VoiceScreen() {
     const styles = createStyles(theme);
     const router = useRouter();
     const { state, startRecording, stopRecording, reset } = useVoiceRecorder();
-    const { mutate: addExpense } = useAddExpense();
+    const { mutateAsync: addExpense } = useAddExpense();
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     // Pulse animation while recording
@@ -44,37 +44,48 @@ export default function VoiceScreen() {
             if (!uri) return;
 
             const result = await parseVoiceExpense(uri);
-            if (!result) {
+            if (!result || result.expenses.length === 0) {
                 toast.error("Couldn't understand that. Try again.");
                 reset();
                 return;
             }
 
-            // Auto-save the expense
-            addExpense({
-                amount: rupeesToPaise(result.amount),
-                merchant: result.merchant,
-                category: result.category as any,
-                expense_date: new Date().toISOString(),
-                description: '',
-            }, {
-                onSuccess: () => {
-                    toast.success(`₹${result.amount} to ${result.merchant} saved`);
-                    reset();
-                    router.back();
-                },
-                onError: (e) => {
-                    toast.error(e.message);
-                    reset();
-                },
-            });
+            const today = new Date().toISOString();
+
+            try {
+                // Save all expenses in parallel using mutateAsync (returns a real Promise)
+                await Promise.all(
+                    result.expenses.map((exp) =>
+                        addExpense({
+                            amount: rupeesToPaise(exp.amount),
+                            merchant: exp.merchant,
+                            category: exp.category as any,
+                            expense_date: today,
+                            description: '',
+                        })
+                    )
+                );
+
+                const count = result.expenses.length;
+                if (count === 1) {
+                    const e = result.expenses[0];
+                    toast.success(`₹${e.amount} to ${e.merchant} saved`);
+                } else {
+                    toast.success(`${count} expenses saved`);
+                }
+                reset();
+                router.back();
+            } catch (e: any) {
+                toast.error(e?.message ?? 'Failed to save expenses');
+                reset();
+            }
         }
     };
 
     const statusText = {
         idle: 'Tap to speak',
         recording: 'Listening... tap to stop',
-        processing: 'Saving expense...',
+        processing: 'Saving expenses...',
         done: 'Done!',
         error: 'Something went wrong',
     }[state];
@@ -85,9 +96,9 @@ export default function VoiceScreen() {
         <View style={styles.container}>
             <Text style={styles.title}>Voice input</Text>
             <Text style={styles.hint}>
-                Say something like:{'\n'}
+                Say one or multiple expenses:{'\n'}
                 "Spent 480 on Swiggy" or{'\n'}
-                "Uber ride 320 rupees"
+                "Zudio 3000, DMart 1000, biryani 250"
             </Text>
 
             {/* Mic button */}

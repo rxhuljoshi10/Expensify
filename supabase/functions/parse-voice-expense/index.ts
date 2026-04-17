@@ -76,30 +76,40 @@ serve(async (req) => {
       throw new Error('No speech detected');
     }
 
-    // Step 2: Gemini Parsing — pipe-delimited output
+
+    // Step 2: Gemini Parsing — extract one or more expenses as a JSON array
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `Given this expense transcript, extract exactly three values separated by pipes (|).
+            text: `You are an expense extraction assistant. The user spoke one or more expenses aloud.
+Extract ALL expenses mentioned and return them as a JSON array.
 
-Value 1: The amount as a plain number (no currency symbols, no commas)
-Value 2: The merchant or vendor name
-Value 3: The best matching category from this list: ${CATEGORIES.join(', ')}
+Each object in the array must have exactly these fields:
+- "amount": a plain number (no currency symbols, no commas)
+- "merchant": the merchant or vendor name
+- "category": the best matching category from this list: ${CATEGORIES.join(', ')}
 
-Reply with ONLY the three values separated by | on a single line. No other text.
+Rules:
+- If only one expense is mentioned, still return an array with one element.
+- Do NOT include any extra text, markdown, or code fences — output raw JSON only.
+- If an amount is ambiguous (e.g. "3k"), convert it to a number (3000).
+
+Example input: "zudio 3000, dmart 1000, chicken biryani 250"
+Example output: [{"amount":3000,"merchant":"Zudio","category":"Shopping"},{"amount":1000,"merchant":"DMart","category":"Shopping"},{"amount":250,"merchant":"Chicken Biryani","category":"Food"}]
 
 Example input: "Spent 200 on Uber ride"
-Example output: 200|Uber|Transport
+Example output: [{"amount":200,"merchant":"Uber","category":"Transport"}]
 
 Input: "${transcript}"
 Output:`
           }]
         }],
         generationConfig: {
-          maxOutputTokens: 1024
+          maxOutputTokens: 5024,
+          responseMimeType: 'application/json',
         }
       }),
     });
@@ -116,23 +126,34 @@ Output:`
       throw new Error('Gemini returned empty response');
     }
 
-    // Parse the pipe-delimited response
-    const parts = raw.split('|').map((s: string) => s.trim());
-    if (parts.length < 3) {
-      throw new Error('Could not parse expense from transcript');
+    // Parse the JSON array response
+    let parsed: { amount: number; merchant: string; category: string }[];
+    try {
+      parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) throw new Error('Not an array');
+    } catch {
+      throw new Error('Could not parse expenses from transcript');
     }
 
-    const amount = parseFloat(parts[0]);
-    if (isNaN(amount)) {
-      throw new Error('Could not extract amount from transcript');
-    }
+    // Validate and sanitise each expense
+    const expenses = parsed
+      .map((item) => {
+        const amount = parseFloat(String(item.amount));
+        if (isNaN(amount) || amount <= 0) return null;
+        const merchant = String(item.merchant || '').trim() || 'Unknown';
+        const category = CATEGORIES.find(
+          (c) => c.toLowerCase() === String(item.category || '').toLowerCase()
+        ) ?? 'Other';
+        return { amount, merchant, category };
+      })
+      .filter(Boolean) as { amount: number; merchant: string; category: string }[];
 
-    const merchant = parts[1];
-    const rawCategory = parts[2];
-    const category = CATEGORIES.find(c => c.toLowerCase() === rawCategory.toLowerCase()) ?? 'Other';
+    if (expenses.length === 0) {
+      throw new Error('Could not extract any valid expenses from transcript');
+    }
 
     return new Response(
-      JSON.stringify({ transcript, amount, merchant, category }),
+      JSON.stringify({ transcript, expenses }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

@@ -4,11 +4,9 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 
 export const parseVoiceExpense = async (audioUri: string): Promise<{
-  amount: number;
-  merchant: string;
-  category: string;
   transcript: string;
-  } | null> => {
+  expenses: { amount: number; merchant: string; category: string }[];
+} | null> => {
   try {
     const today = new Date().toISOString().split('T')[0];
 
@@ -27,12 +25,24 @@ export const parseVoiceExpense = async (audioUri: string): Promise<{
       body: formData,
     });
 
-    if (error) throw error;
+    if (error) {
+      // FunctionsHttpError carries the raw response — read its body for the real message
+      const body = await (error as any)?.context?.json?.().catch(() => null);
+      console.error('[parseVoiceExpense] Edge Function error:', {
+        message: (error as any).message,
+        status: (error as any)?.context?.status,
+        body,
+      });
+      throw error;
+    }
+
+    console.log('[parseVoiceExpense] Raw response from edge function:', JSON.stringify(data));
+
     if (data.error) throw new Error(data.error);
 
-    return data;
+    return data; // { transcript, expenses: [{amount, merchant, category}] }
   } catch (e) {
-    console.log('Voice parse error:', e);
+    console.error('[parseVoiceExpense] Caught error:', e);
     return null;
   }
 };
@@ -74,7 +84,6 @@ export const pickAndScanBill = async (): Promise<{
     if (result.canceled) return null;
 
     // Compress to ~600KB — enough for Vision to read clearly
-    // Google Vision works better with slightly higher quality than Claude Vision
     const compressed = await ImageManipulator.manipulateAsync(
       result.assets[0].uri,
       [{ resize: { width: 1500 } }],
@@ -89,6 +98,7 @@ export const pickAndScanBill = async (): Promise<{
 
     const today = new Date().toISOString().split('T')[0];
 
+    console.log("Image compressed successfully")
     const { data, error } = await supabase.functions.invoke('scan-bill', {
       body: {
         imageBase64: compressed.base64,
