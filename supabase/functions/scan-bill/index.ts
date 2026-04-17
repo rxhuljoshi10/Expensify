@@ -52,7 +52,7 @@ async function parseReceiptText(ocrText: string, today: string): Promise<object>
         contents: [{
           parts: [{
             text: `You are a receipt parser. Extract expense details from this OCR text of a receipt.
-Return ONLY valid JSON with no explanation, no markdown, no code fences.
+Return ONLY a single valid JSON object with NO explanation, NO markdown, NO code fences.
 
 Today's date: ${today}
 Categories available: ${CATEGORIES.join(', ')}
@@ -60,26 +60,27 @@ Categories available: ${CATEGORIES.join(', ')}
 OCR Text:
 ${ocrText}
 
-Extract all expense items from the following bill or receipt scanned through OCR.
+Return EXACTLY this JSON shape:
+{
+  "merchant": "store name",
+  "total": 250.00,
+  "date": "YYYY-MM-DD or null",
+  "category": "one of the categories listed above",
+  "items": ["item 1", "item 2", ...],
+  "confidence": "high | medium | low"
+}
 
 Rules:
-- Ignore total, tax, GST, subtotal
-- Extract individual items
-- amount must be number
-
-Return ONLY JSON array.
-[
-  {
-    "item": "Pizza",
-    "amount": 120,
-    "category": "Food"
-  }
-]`,
+- "total" must be a number (not a string). Use the grand total / final payable amount.
+- "date" must be YYYY-MM-DD format or null if not found.
+- "items" should be a list of ALL product/item names found on the receipt.
+- "confidence" is your confidence in the extraction: high if all fields found clearly, low if OCR was unclear.`,
           }],
         }],
         generationConfig: {
-          temperature: 0.1,   // low temperature for consistent structured output
-          maxOutputTokens: 300,
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
         },
       }),
     }
@@ -92,7 +93,7 @@ Return ONLY JSON array.
   const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
   if (!raw) throw new Error('Empty response from Gemini');
 
-  // Strip any accidental markdown fences
+  // Strip any accidental markdown fences just in case
   const cleaned = raw.replace(/```json\n?|\n?```/g, '').trim();
   return JSON.parse(cleaned);
 }
@@ -115,11 +116,11 @@ serve(async (req) => {
     // Run Vision OCR
     const ocrText = await extractTextFromImage(imageBase64);
 
-    // Parse with Gemini
-    const parsed = await parseReceiptText(ocrText, todayStr);
+    // Parse with Gemini as a flat object
+    const parsed = await parseReceiptText(ocrText, todayStr) as any;
 
     return new Response(
-      JSON.stringify({ ...parsed as object, ocrText }),
+      JSON.stringify({ ...parsed, ocrText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

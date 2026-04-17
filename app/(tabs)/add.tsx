@@ -12,6 +12,7 @@ import { useTheme, Theme } from '../../lib/theme';
 import { useEffect, useRef } from 'react';
 import { categorizeExpense } from '../../lib/ai';
 import { pickAndScanBill } from '../../lib/ai';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function AddExpenseScreen() {
     const theme = useTheme();
@@ -94,7 +95,7 @@ export default function AddExpenseScreen() {
 
         // If items were found, put them in the description
         if (result.items?.length > 0) {
-            setDescription(result.items.slice(0, 3).join(', '));
+            setDescription(result.items.join(', '));
         }
     };
 
@@ -116,6 +117,26 @@ export default function AddExpenseScreen() {
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
                 <Text style={styles.heading}>Add expense</Text>
+
+                <TouchableOpacity
+                    style={styles.scanButton}
+                    onPress={handleScanBill}
+                    disabled={isScanning}
+                    activeOpacity={0.7}
+                >
+                    <View style={styles.scanIconContainer}>
+                        <Ionicons name="camera" size={24} color={theme.primary} />
+                    </View>
+                    <View style={styles.scanTextContainer}>
+                        <Text style={styles.scanTitle}>
+                            {isScanning ? 'Scanning...' : 'Scan Receipt'}
+                        </Text>
+                        <Text style={styles.scanSubtitle}>
+                            Auto-fill details from a photo
+                        </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                </TouchableOpacity>
 
                 <Text style={styles.label}>Amount (₹)</Text>
                 <TextInput
@@ -167,16 +188,6 @@ export default function AddExpenseScreen() {
                 <TouchableOpacity style={[styles.saveButton, isPending && styles.saveButtonDisabled]} onPress={handleSave} disabled={isPending}>
                     <Text style={styles.saveButtonText}>{isPending ? 'Saving...' : 'Save Expense'}</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.scanButton}
-                    onPress={handleScanBill}
-                    disabled={isScanning}
-                >
-                    <Text style={styles.scanButtonText}>
-                        {isScanning ? '⏳ Scanning...' : '📷 Scan a bill'}
-                    </Text>
-                </TouchableOpacity>
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -185,19 +196,45 @@ export default function AddExpenseScreen() {
 function createStyles(theme: Theme) {
     return StyleSheet.create({
         container: { flex: 1, backgroundColor: theme.background, padding: 24 },
-        heading: { fontSize: 24, fontWeight: '700', marginBottom: 24, marginTop: 16, color: theme.text },
+        heading: { fontSize: 24, fontWeight: '700', marginBottom: 20, marginTop: 16, color: theme.text },
+        scanButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: theme.primary + '11',
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 24,
+            borderWidth: 1,
+            borderColor: theme.primary + '33',
+        },
+        scanIconContainer: {
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            backgroundColor: theme.primary + '22',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 16,
+        },
+        scanTextContainer: {
+            flex: 1,
+        },
+        scanTitle: {
+            fontSize: 16,
+            fontWeight: '700',
+            color: theme.text,
+        },
+        scanSubtitle: {
+            fontSize: 12,
+            color: theme.textSecondary,
+            marginTop: 2,
+        },
         label: { fontSize: 13, color: theme.textSecondary, marginBottom: 6, marginTop: 16 },
         amountInput: { fontSize: 40, fontWeight: '700', color: theme.text, borderBottomWidth: 2, borderColor: theme.primary, paddingBottom: 8 },
         input: { borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14, fontSize: 16, backgroundColor: theme.inputBg, color: theme.text, justifyContent: 'center' },
-        saveButton: { backgroundColor: theme.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32, marginBottom: 48 },
+        saveButton: { backgroundColor: theme.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32, marginBottom: 60 },
         saveButtonDisabled: { opacity: 0.6 },
         saveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
         errorText: { fontSize: 12, color: '#ff4444', marginTop: 4, marginBottom: 4 },
-        scanButton: {
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-            borderWidth: 1.5, borderColor: '#6C63FF', borderRadius: 12,
-            borderStyle: 'dashed', padding: 14, marginBottom: 24,
-        },
-        scanButtonText: { fontSize: 15, color: '#6C63FF', fontWeight: '500' },
     });
 }

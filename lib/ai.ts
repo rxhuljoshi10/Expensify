@@ -2,6 +2,7 @@
 import { supabase } from './supabase';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { Alert } from 'react-native';
 
 export const parseVoiceExpense = async (audioUri: string): Promise<{
   transcript: string;
@@ -74,14 +75,35 @@ export const pickAndScanBill = async (): Promise<{
 } | null> => {
   try {
     // Ask user: camera or gallery
-    const result = await ImagePicker.launchCameraAsync({
+    const choice = await new Promise<'camera' | 'gallery' | 'cancel'>((resolve) => {
+      Alert.alert(
+        'Scan Bill',
+        'Choose an image source',
+        [
+          { text: 'Camera', onPress: () => resolve('camera') },
+          { text: 'Gallery', onPress: () => resolve('gallery') },
+          { text: 'Cancel', onPress: () => resolve('cancel'), style: 'cancel' }
+        ],
+        { cancelable: true, onDismiss: () => resolve('cancel') }
+      );
+    });
+
+    if (choice === 'cancel') return null;
+
+    const pickerOptions: ImagePicker.ImagePickerOptions = {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,    // start with full quality — we compress below
       allowsEditing: true,
       aspect: [3, 4],  // portrait crop — most receipts are tall
-    });
+    };
+
+    const result = choice === 'camera' 
+      ? await ImagePicker.launchCameraAsync(pickerOptions)
+      : await ImagePicker.launchImageLibraryAsync(pickerOptions);
 
     if (result.canceled) return null;
+
+    console.log("Image selected successfully")
 
     // Compress to ~600KB — enough for Vision to read clearly
     const compressed = await ImageManipulator.manipulateAsync(
@@ -106,13 +128,24 @@ export const pickAndScanBill = async (): Promise<{
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      const body = await (error as any)?.context?.json?.().catch(() => null);
+      console.error('[pickAndScanBill] Edge Function error:', {
+        message: (error as any).message,
+        status: (error as any)?.context?.status,
+        body,
+      });
+      throw error;
+    }
+
+    console.log('[pickAndScanBill] Raw response from edge function:', JSON.stringify(data));
+
     if (data.error) throw new Error(data.error);
 
     return data;
 
   } catch (e: any) {
-    console.log('Bill scan error:', e.message);
+    console.error('[pickAndScanBill] Caught error:', e.message ?? e);
     return null;
   }
 };
