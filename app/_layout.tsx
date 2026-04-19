@@ -1,5 +1,6 @@
 // app/_layout.tsx
 import { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
@@ -14,7 +15,8 @@ function AuthGuard() {
   const router = useRouter();
 
   useEffect(() => {
-    initialize();
+    const unsubscribe = initialize();
+    return () => unsubscribe?.();
   }, []);
 
   useEffect(() => {
@@ -28,6 +30,17 @@ function AuthGuard() {
       router.replace('/(tabs)/home');
     }
   }, [session, isLoading, segments]);
+
+  // Block rendering until we know the auth state.
+  // Without this, Expo Router shows the login screen briefly
+  // even when the user has a valid persisted session.
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#6366f1" />
+      </View>
+    );
+  }
 
   return <Slot />;
 }

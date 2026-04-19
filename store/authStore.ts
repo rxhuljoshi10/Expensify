@@ -8,7 +8,7 @@ interface AuthState {
     isLoading: boolean;
     setSession: (session: Session | null) => void;
     signOut: () => Promise<void>;
-    initialize: () => void;
+    initialize: () => (() => void);
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -31,13 +31,16 @@ export const useAuthStore = create<AuthState>((set) => ({
         });
 
         // Listen for auth changes (login, logout, token refresh)
-        supabase.auth.onAuthStateChange(async (_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
             set({ session, user: session?.user ?? null, isLoading: false });
-            
+
             if (_event === 'SIGNED_IN' && session?.user) {
                 // Register push token in background — don't await
                 // registerForPushNotifications(session.user.id).catch(console.error);
             }
         });
+
+        // Return unsubscribe so the caller can clean up
+        return () => subscription.unsubscribe();
     },
 }));

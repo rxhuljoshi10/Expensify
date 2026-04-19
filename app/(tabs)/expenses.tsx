@@ -1,6 +1,7 @@
 // app/(tabs)/expenses.tsx
 import { useState, useMemo } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useExpenses, useGroupExpenses, useDeleteExpense } from '../../hooks/useExpenses';
 import ExpenseRow from '../../components/ExpenseRow';
@@ -45,59 +46,63 @@ export default function ExpensesScreen() {
   if (isLoading) return <ExpenseListSkeleton />;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
 
-      {group && (
-        <View style={styles.viewTogglePadding}>
-          <View style={styles.viewToggle}>
-            <TouchableOpacity
-              style={viewMode === 'personal' ? styles.activeTab : styles.inactiveTab}
-              onPress={() => setViewMode('personal')}
-            >
-              <Text style={viewMode === 'personal' ? styles.activeTabText : styles.inactiveTabText}>
-                👤 Personal
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={viewMode === 'group' ? styles.activeTab : styles.inactiveTab}
-              onPress={() => setViewMode('group')}
-            >
-              <Text style={viewMode === 'group' ? styles.activeTabText : styles.inactiveTabText}>
-                👨‍👩‍👧 {group.name}
-              </Text>
-            </TouchableOpacity>
+      {/* Fixed header — never shrinks regardless of list size */}
+      <View>
+        {group && (
+          <View style={styles.viewTogglePadding}>
+            <View style={styles.viewToggle}>
+              <TouchableOpacity
+                style={viewMode === 'personal' ? styles.activeTab : styles.inactiveTab}
+                onPress={() => setViewMode('personal')}
+              >
+                <Text style={viewMode === 'personal' ? styles.activeTabText : styles.inactiveTabText}>
+                  👤 Personal
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={viewMode === 'group' ? styles.activeTab : styles.inactiveTab}
+                onPress={() => setViewMode('group')}
+              >
+                <Text style={viewMode === 'group' ? styles.activeTabText : styles.inactiveTabText}>
+                  👨‍👩‍👧 {group.name}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      <View style={styles.searchBox}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search expenses..."
-          placeholderTextColor={theme.textSecondary}
-          value={search}
-          onChangeText={setSearch}
+        <View style={styles.searchBox}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search expenses..."
+            placeholderTextColor={theme.textSecondary}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+
+        <FlatList
+          horizontal
+          data={[{ name: 'All', icon: '✨', color: '#6C63FF' }, ...CATEGORIES]}
+          keyExtractor={i => i.name}
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterRow}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.filterChip, activeCategory === item.name && styles.filterChipActive]}
+              onPress={() => setActiveCategory(item.name as Category | 'All')}
+            >
+              <Text style={[styles.filterChipText, activeCategory === item.name && styles.filterChipTextActive]}>
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          )}
         />
       </View>
 
-      <FlatList
-        horizontal
-        data={[{ name: 'All', icon: '✨', color: '#6C63FF' }, ...CATEGORIES]}
-        keyExtractor={i => i.name}
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterRow}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.filterChip, activeCategory === item.name && styles.filterChipActive]}
-            onPress={() => setActiveCategory(item.name as Category | 'All')}
-          >
-            <Text style={[styles.filterChipText, activeCategory === item.name && styles.filterChipTextActive]}>
-              {item.name}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
-
+      {/* Scrollable expenses list — takes all remaining space */}
       {filtered.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyIcon}>💸</Text>
@@ -105,25 +110,27 @@ export default function ExpensesScreen() {
           <Text style={styles.emptySubtext}>Tap + to add your first one</Text>
         </View>
       ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={e => e.id}
-          renderItem={({ item }) => (
-            <ExpenseRow
-              expense={item}
-              onPress={() => router.push(`/edit-expense?id=${item.id}`)}
-              onLongPress={() => confirmDelete(item.id, item.merchant)}
-            />
-          )}
-        />
+        <View style={styles.listContainer}>
+          <FlatList
+            data={filtered}
+            keyExtractor={e => e.id}
+            renderItem={({ item }) => (
+              <ExpenseRow
+                expense={item}
+                onPress={() => router.push(`/edit-expense?id=${item.id}`)}
+                onLongPress={() => confirmDelete(item.id, item.merchant)}
+              />
+            )}
+          />
+        </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 function createStyles(theme: Theme) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background, paddingTop: 16 },
+    container: { flex: 1, backgroundColor: theme.background },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     searchBox: { padding: 10 },
     searchInput: {
