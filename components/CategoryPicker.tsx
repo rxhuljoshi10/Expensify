@@ -11,9 +11,16 @@ export default function CategoryPicker({ selected, onSelect }: Props) {
     const theme = useTheme();
     const styles = createStyles(theme);
 
+    // Shift the selected category to the front of the list
+    const sortedCategories = [...CATEGORIES].sort((a, b) => {
+        if (a.name === selected) return -1;
+        if (b.name === selected) return 1;
+        return 0;
+    });
+
     return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll}>
-            {CATEGORIES.map(cat => (
+            {sortedCategories.map(cat => (
                 <TouchableOpacity
                     key={cat.name}
                     style={[styles.chip, selected === cat.name && { backgroundColor: cat.color, borderColor: cat.color }]}
