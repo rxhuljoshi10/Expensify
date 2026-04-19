@@ -4,6 +4,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
+import { useSettingsStore } from '../store/settingsStore';
 import Toast from 'react-native-toast-message';
 import OfflineBanner from '../components/OfflineBanner';
 
@@ -11,10 +12,12 @@ const queryClient = new QueryClient();
 
 function AuthGuard() {
   const { session, isLoading, initialize } = useAuthStore();
+  const { loadSettings } = useSettingsStore();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
+    loadSettings();
     const unsubscribe = initialize();
     return () => unsubscribe?.();
   }, []);

@@ -1,5 +1,5 @@
 // lib/theme.ts
-import { useColorScheme } from 'react-native';
+import { useSettingsStore } from '../store/settingsStore';
 
 export const lightTheme = {
     background: '#f8f8ff',
@@ -34,7 +34,6 @@ export const darkTheme = {
 export type Theme = typeof lightTheme;
 
 export const useTheme = (): Theme => {
-    // const scheme = useColorScheme();
-    const scheme = 'dark';
+    const scheme = useSettingsStore(state => state.theme);
     return scheme === 'dark' ? darkTheme : lightTheme;
-};
+};
