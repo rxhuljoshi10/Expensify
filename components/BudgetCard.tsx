@@ -6,9 +6,13 @@ import { Budget } from '../types/expense';
 import { formatAmount } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
 
-interface Props { budget: Budget | null; spentPaise: number; }
+interface Props { 
+    budget: Budget | null; 
+    spentPaise: number; 
+    monthByCategory?: { name: string; total: number; color: string; icon: string }[];
+}
 
-export default function BudgetCard({ budget, spentPaise }: Props) {
+export default function BudgetCard({ budget, spentPaise, monthByCategory }: Props) {
     const theme = useTheme();
     const styles = createStyles(theme);
     const router = useRouter();
@@ -62,6 +66,34 @@ export default function BudgetCard({ budget, spentPaise }: Props) {
             ) : (
                 <Text style={styles.safeText}>{formatAmount(remaining)} remaining · {Math.round(pct)}% used</Text>
             )}
+
+            {budget.category_budgets && Object.keys(budget.category_budgets).length > 0 && (
+                <View style={styles.catConfigsContainer}>
+                   <View style={styles.catConfigsDivider} />
+                   <Text style={styles.catConfigsTitle}>Category limits</Text>
+                   {Object.keys(budget.category_budgets).map(catName => {
+                       const catBudget = budget.category_budgets![catName] as number;
+                       const catSpent = monthByCategory?.find(c => c.name === catName)?.total || 0;
+                       const catPct = Math.min((catSpent / catBudget) * 100, 100);
+                       const catIsOver = catSpent > catBudget;
+                       const catColor = catIsOver ? '#ff4444' : (catPct >= 80 ? '#FF9500' : theme.primary);
+
+                       return (
+                           <View key={catName} style={styles.catRow}>
+                                <View style={styles.catHeader}>
+                                    <Text style={styles.catName}>{catName}</Text>
+                                    <Text style={[styles.catAmounts, catIsOver && { color: '#ff4444' }]}>
+                                        {formatAmount(catSpent)} / {formatAmount(catBudget)}
+                                    </Text>
+                                </View>
+                                <View style={styles.catTrack}>
+                                    <View style={[styles.catFill, { backgroundColor: catColor, width: `${catPct}%` }]} />
+                                </View>
+                           </View>
+                       )
+                   })}
+                </View>
+            )}
         </View>
     );
 }
@@ -86,5 +118,15 @@ function createStyles(theme: Theme) {
         alertText: { fontSize: 13, color: '#ff4444', fontWeight: '500' },
         warningText: { fontSize: 13, color: '#FF9500' },
         safeText: { fontSize: 13, color: theme.textSecondary },
+        
+        catConfigsContainer: { marginTop: 16 },
+        catConfigsDivider: { height: 1, backgroundColor: theme.border, marginBottom: 16 },
+        catConfigsTitle: { fontSize: 12, fontWeight: '600', color: theme.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 16 },
+        catRow: { marginBottom: 14 },
+        catHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+        catName: { fontSize: 13, color: theme.text, fontWeight: '500' },
+        catAmounts: { fontSize: 12, color: theme.textSecondary, fontWeight: '500' },
+        catTrack: { height: 6, backgroundColor: theme.border, borderRadius: 3, overflow: 'hidden' },
+        catFill: { height: '100%', borderRadius: 3 },
     });
 }

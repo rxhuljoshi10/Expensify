@@ -38,7 +38,7 @@ export default function HomeScreen() {
 
   const {
     isLoading, todayTotal, weekTotal, monthTotal, periodTotal,
-    byCategory, historicalWeeksData, recentExpenses,
+    byCategory, monthByCategory, historicalWeeksData, recentExpenses,
     topCategory, averageDailySpend, largestExpense,
     memberBreakdown
   } = useDashboardStats(period);
@@ -119,7 +119,7 @@ export default function HomeScreen() {
 
         <SpendingPieChart data={byCategory} />
         <DailyBarChart historicalWeeksData={historicalWeeksData} />
-        <BudgetCard budget={budget ?? null} spentPaise={monthTotal} />
+        <BudgetCard budget={budget ?? null} spentPaise={monthTotal} monthByCategory={monthByCategory} />
         {dueTodayCount > 0 && (
           <TouchableOpacity
             style={styles.recurringNudge}

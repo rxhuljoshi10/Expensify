@@ -33,17 +33,33 @@ export default function BudgetSettingsScreen() {
     const handleSave = () => {
         const parsed = parseFloat(totalBudget);
         if (isNaN(parsed) || parsed <= 0) { toast.error('Please enter a valid monthly budget'); return; }
+        
         const catPaise: Record<string, number> = {};
-        Object.entries(categoryBudgets).forEach(([k, v]) => { const n = parseFloat(v); if (!isNaN(n) && n > 0) catPaise[k] = rupeesToPaise(n); });
-        setBudget({ totalBudget: rupeesToPaise(parsed), categoryBudgets: catPaise }, {
+        let catTotal = 0;
+        Object.entries(categoryBudgets).forEach(([k, v]) => { 
+            const n = parseFloat(v); 
+            if (!isNaN(n) && n > 0) {
+                const asPaise = rupeesToPaise(n);
+                catPaise[k] = asPaise;
+                catTotal += asPaise;
+            }
+        });
+
+        const totalPaise = rupeesToPaise(parsed);
+        if (catTotal > totalPaise) {
+            toast.error('Category limits cannot exceed total budget!');
+            return;
+        }
+
+        setBudget({ totalBudget: totalPaise, categoryBudgets: catPaise }, {
             onSuccess: () => { toast.success('Budget updated'); router.back(); },
             onError: (e) => toast.error(e.message),
         });
     };
 
     return (
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
                 <Text style={styles.heading}>Budget settings</Text>
                 <Text style={styles.subheading}>{new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</Text>
 
@@ -57,6 +73,12 @@ export default function BudgetSettingsScreen() {
                     keyboardType="decimal-pad"
                     autoFocus
                 />
+
+                <TouchableOpacity style={[styles.saveButton, isPending && styles.disabled]} onPress={handleSave} disabled={isPending}>
+                    <Text style={styles.saveButtonText}>{isPending ? 'Saving...' : 'Save Budget'}</Text>
+                </TouchableOpacity>
+
+                <View style={styles.divider} />
 
                 <Text style={styles.sectionTitle}>Per-category limits (optional)</Text>
                 <Text style={styles.sectionSubtext}>Leave blank to skip a category</Text>
@@ -76,10 +98,6 @@ export default function BudgetSettingsScreen() {
                     </View>
                 ))}
 
-                <TouchableOpacity style={[styles.saveButton, isPending && styles.disabled]} onPress={handleSave} disabled={isPending}>
-                    <Text style={styles.saveButtonText}>{isPending ? 'Saving...' : 'Save Budget'}</Text>
-                </TouchableOpacity>
-                <View style={{ height: 48 }} />
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -98,8 +116,9 @@ function createStyles(theme: Theme) {
         categoryIcon: { fontSize: 20, width: 28 },
         categoryName: { flex: 1, fontSize: 15, color: theme.text },
         categoryInput: { width: 100, borderWidth: 1, borderColor: theme.border, borderRadius: 8, padding: 8, fontSize: 14, textAlign: 'right', backgroundColor: theme.inputBg, color: theme.text },
-        saveButton: { backgroundColor: theme.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32 },
+        saveButton: { backgroundColor: theme.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginBottom: 32 },
         disabled: { opacity: 0.6 },
         saveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+        divider: { height: 1, backgroundColor: theme.border, marginBottom: 24, marginTop: 16 }
     });
 }

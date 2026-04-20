@@ -65,8 +65,15 @@ export const useDashboardStats = (
             .reduce((s, e) => s + e.amount, 0);
         const weekTotal = filterByPeriod(expenses, 'week')
             .reduce((s, e) => s + e.amount, 0);
-        const monthTotal = filterByPeriod(expenses, 'month')
-            .reduce((s, e) => s + e.amount, 0);
+        const monthExpenses = filterByPeriod(expenses, 'month');
+        const monthTotal = monthExpenses.reduce((s, e) => s + e.amount, 0);
+
+        const monthByCategory = CATEGORIES.map(cat => {
+            const total = monthExpenses
+                .filter(e => e.category === cat.name)
+                .reduce((s, e) => s + e.amount, 0);
+            return { name: cat.name, total, color: cat.color, icon: cat.icon };
+        }).filter(c => c.total > 0);
 
         // Filter for the selected period (used in charts)
         const periodExpenses = filterByPeriod(expenses, period, customFrom, customTo);
@@ -185,6 +192,7 @@ export const useDashboardStats = (
             periodExpenses,
             memberBreakdown,
             byCategory,
+            monthByCategory,
             historicalWeeksData,
             recentExpenses,
             topCategory,
