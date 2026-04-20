@@ -2,118 +2,152 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')!;
-const SUPABASE_URL       = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+const SUPABASE_URL       = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-serve(async () => {
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+    console.log("Function triggered: ", req.method);
+    
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders });
+    }
+
+    if (!GEMINI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+        console.error("CRITICAL: Missing environment variables");
+        return new Response(JSON.stringify({ error: "Server configuration error (env)" }), { status: 500, headers: corsHeaders });
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-    // Get all users
-    const { data: users } = await supabase.from('users').select('id');
-    if (!users) return new Response('No users');
+    try {
+        let userId: string | null = null;
+        if (req.method === 'POST') {
+            try {
+                const body = await req.json();
+                userId = body.userId;
+                console.log("Received userId:", userId);
+            } catch (e) {
+                console.log("No JSON body found, likely cron request");
+            }
+        }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    const weekStr = d.toISOString().split('T')[0];
-    const monthStr = new Date().toISOString().slice(0, 7) + '-01';
-    
-    const oldest = monthStr < weekStr ? monthStr : weekStr;
+        // Fetch users to process
+        let userList = [];
+        if (userId) {
+            userList = [{ id: userId }];
+        } else {
+            console.log("Fetching all users for batch processing...");
+            const { data, error: userError } = await supabase.from('users').select('id');
+            if (userError) throw new Error("Users fetch failed: " + userError.message);
+            userList = data || [];
+        }
 
-    let processed = 0;
+        if (userList.length === 0) {
+            console.log("No users found to process.");
+            return new Response(JSON.stringify({ error: 'No users found' }), { status: 404, headers: corsHeaders });
+        }
 
-    for (const user of users) {
-        try {
-            // Get expenses
-            const { data: expenses } = await supabase
-                .from('expenses')
-                .select('amount, category, merchant, expense_date')
-                .eq('user_id', user.id)
-                .gte('expense_date', oldest)
-                .order('expense_date', { ascending: false });
+        let processed = 0;
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const sinceStr = thirtyDaysAgo.toISOString().split('T')[0];
 
-            if (!expenses) continue;
+        for (const user of userList) {
+            try {
+                console.log(`Processing User: ${user.id}`);
+                const { data: expenses, error: expError } = await supabase
+                    .from('expenses')
+                    .select('amount, category, merchant, expense_date')
+                    .eq('user_id', user.id)
+                    .gte('expense_date', sinceStr);
 
-            const dailyExpenses = expenses.filter(e => e.expense_date >= todayStr);
-            const weeklyExpenses = expenses.filter(e => e.expense_date >= weekStr);
-            const monthlyExpenses = expenses.filter(e => e.expense_date >= monthStr);
+                if (expError) {
+                    console.error(`Error fetching expenses for ${user.id}:`, expError);
+                    continue;
+                }
 
-            const generateForPeriod = async (expList: any[], type: string, description: string) => {
-                if (expList.length < 1) return; // Need at least some data
+                const expenseList = expenses || [];
+                console.log(`Found ${expenseList.length} expenses for coaching.`);
 
-                const total = expList.reduce((s, e) => s + e.amount, 0);
-                const byCategory: Record<string, number> = {};
-                expList.forEach(e => {
-                    byCategory[e.category] = (byCategory[e.category] ?? 0) + e.amount;
+                const totalPaise = expenseList.reduce((s, e) => s + e.amount, 0);
+                const catTotals: Record<string, number> = {};
+                expenseList.forEach(e => {
+                    catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
                 });
-                
-                const sortedCategories = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
-                if (sortedCategories.length === 0) return;
-                
-                const topCategory = sortedCategories[0];
 
-                const summary = `
-Total spent ${description}: ₹${Math.round(total / 100)}
-Number of transactions: ${expList.length}
-Top category: ${topCategory[0]} (₹${Math.round(topCategory[1] / 100)})
-Categories: ${sortedCategories.map(([k, v]) => `${k}: ₹${Math.round(v / 100)}`).join(', ')}
-                `.trim();
+                const context = `User: ${user.id}\nTransactions: ${expenseList.length}\nTotal: ₹${Math.round(totalPaise / 100)}\nProfile: ${Object.entries(catTotals).map(([k,v]) => `${k}: ₹${Math.round(v/100)}`).join(', ')}`;
 
-                const response = await fetch(
+                console.log("Calling Gemini API...");
+                const aiResponse = await fetch(
                     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            contents: [{
-                                parts: [{
-                                    text: `Based on this ${description} spending summary, write ONE short, specific, actionable insight (max 2 sentences). Be conversational, not preachy. Focus on the most interesting pattern.
-
-${summary}
-
-Write only the insight text, no labels or formatting.`,
-                                }],
-                            }],
-                            generationConfig: { maxOutputTokens: 2024 },
+                            contents: [{ parts: [{ text: `You are a Smart Financial Coach. Return a JSON briefing.
+{
+  "briefing": "Conversational summary.",
+  "vital_signs": { "status": "on_track"|"warning", "burn_rate": "low"|"high", "top_leak": "category" },
+  "anomaly": "Insight or null",
+  "tip": "Action tip."
+}
+DATA:
+${context}` }] }],
+                            generationConfig: { responseMimeType: "application/json" }
                         }),
                     },
                 );
 
-                const aiData = await response.json();
+                const aiData = await aiResponse.json();
+                if (!aiData.candidates?.[0]) {
+                    console.error("AI returned no candidates:", JSON.stringify(aiData));
+                    continue;
+                }
                 
-                if (!aiData.candidates || !aiData.candidates[0]) return;
-                
-                const content = aiData.candidates[0].content.parts[0].text.trim();
+                const resultText = aiData.candidates[0].content.parts[0].text;
+                console.log("AI Response received:", resultText);
+                const result = JSON.parse(resultText);
 
-                await supabase.from('insights').upsert({
+                const insertData: any = {
                     user_id: user.id,
-                    type: type,
-                    content,
+                    type: 'coaching_briefing',
+                    content: result.briefing,
                     generated_at: new Date().toISOString(),
-                    is_read: false,
-                }, { onConflict: 'user_id,type' });
+                };
 
-                await new Promise(r => setTimeout(r, 500)); // Rate limit buffer
-            };
+                console.log("Inserting insight into database...");
+                const { error: insertError } = await supabase.from('insights').insert({
+                    ...insertData,
+                    metadata: result
+                });
 
-            // Only generate monthly if enough data
-            if (monthlyExpenses.length >= 3) {
-                await generateForPeriod(monthlyExpenses, 'monthly_summary', 'this month');
+                if (insertError) {
+                    console.warn("Primary insert failed, attempting fallback:", insertError.message);
+                    const { error: fallbackError } = await supabase.from('insights').insert({
+                        ...insertData,
+                        content: result.briefing + "\n\nJSON_DATA:" + JSON.stringify(result)
+                    });
+                    if (fallbackError) console.error("Fallback insert also failed:", fallbackError.message);
+                } else {
+                    console.log("Insight saved successfully.");
+                }
+
+                processed++;
+            } catch (e) {
+                console.error(`Error in user loop for ${user.id}:`, e);
             }
-            if (weeklyExpenses.length >= 2) {
-                await generateForPeriod(weeklyExpenses, 'weekly_summary', 'this week');
-            }
-            if (dailyExpenses.length >= 1) {
-                await generateForPeriod(dailyExpenses, 'daily_summary', 'today');
-            }
-
-            processed++;
-
-        } catch (e) {
-            console.error(`Error for user ${user.id}:`, e);
         }
-    }
 
-    return new Response(`Generated insights for ${processed} users`);
+        return new Response(JSON.stringify({ success: true, processed }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+    } catch (error) {
+        console.error("CRITICAL Top level error:", error);
+        return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 });
