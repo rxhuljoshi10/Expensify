@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useFamilyGroup } from '../../hooks/useFamilyGroup';
 import { useTheme, Theme } from '../../lib/theme';
 
@@ -41,6 +42,7 @@ export default function ProfileScreen() {
   const { user, signOut } = useAuthStore();
   const { theme: colorScheme, toggleTheme, notificationsEnabled, setNotificationsEnabled } = useSettingsStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: group } = useFamilyGroup();
 
   const [name, setName] = useState<string>(user?.user_metadata?.full_name ?? '');
@@ -59,7 +61,20 @@ export default function ProfileScreen() {
   const saveName = async () => {
     if (!name.trim()) { setEditingName(false); return; }
     setSaving(true);
-    const { error } = await supabase.auth.updateUser({ data: { full_name: name.trim() } });
+    const { data, error } = await supabase.auth.updateUser({ data: { full_name: name.trim() } });
+    if (data?.user) {
+      await supabase.auth.refreshSession();
+      
+      // Push name change to family group so other members see it immediately
+      if (group && group.owner_id !== data.user.id) {
+         const modernMembers = (group.members ?? []).map(m => 
+             m.user_id === data.user.id ? { ...m, name: name.trim() } : m
+         );
+         await supabase.from('family_groups').update({ members: modernMembers }).eq('id', group.id);
+      }
+
+      queryClient.invalidateQueries(); // Wipe all cached data relying on names
+    }
     setSaving(false);
     setEditingName(false);
     if (error) Alert.alert('Error', error.message);
@@ -69,7 +84,10 @@ export default function ProfileScreen() {
   const saveDOB = async (date: Date) => {
     setDob(date);
     setShowPicker(false);
-    const { error } = await supabase.auth.updateUser({ data: { dob: date.toISOString().split('T')[0] } });
+    const { data, error } = await supabase.auth.updateUser({ data: { dob: date.toISOString().split('T')[0] } });
+    if (data?.user) {
+      await supabase.auth.refreshSession();
+    }
     if (error) Alert.alert('Error', error.message);
     else Toast.show({ type: 'success', text1: 'Date of birth saved ✓' });
   };

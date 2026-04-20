@@ -151,7 +151,7 @@ export default function FamilyScreen() {
                         </Text>
                     </View>
                     <View style={styles.memberInfo}>
-                        <Text style={styles.memberName}>
+                        <Text style={styles.memberName} numberOfLines={1}>
                             {group.owner_id === user?.id ? 'You' : 'Owner'}
                         </Text>
                         <Text style={styles.memberRole}>Owner</Text>
@@ -167,7 +167,7 @@ export default function FamilyScreen() {
                             </Text>
                         </View>
                         <View style={styles.memberInfo}>
-                            <Text style={styles.memberName}>
+                            <Text style={styles.memberName} numberOfLines={1}>
                                 {member.user_id === user?.id ? 'You' : member.name}
                             </Text>
                             <Text style={styles.memberRole}>{member.email}</Text>

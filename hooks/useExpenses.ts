@@ -152,23 +152,32 @@ export const useGroupExpenses = () => {
       if (error) throw error;
 
       return (data ?? []).map(e => {
-        const member = group.members?.find(m => m.user_id === e.user_id);
         const isOwner = e.user_id === group.owner_id;
+        const isSelf = e.user_id === user?.id;
         
-        let mName = member?.name;
-        
-        // robust fallback if name is an empty string
-        if (!mName || mName.trim() === '') {
-            if (member?.email) {
-                mName = member.email.split('@')[0];
-            } else if (isOwner) {
-                mName = group.name + ' Owner';
-            } else {
-                mName = 'Group Member';
+        let mName = '';
+
+        if (isSelf) {
+            // Guarantee perfect sync: if the expense belongs to the local user, use their exact live auth metadata.
+            mName = user?.user_metadata?.full_name;
+        }
+
+        if (!mName) {
+            const member = group.members?.find(m => m.user_id === e.user_id);
+            mName = member?.name;
+            
+            if (!mName || mName.trim() === '') {
+                if (member?.email) {
+                    mName = member.email.split('@')[0];
+                } else if (isOwner) {
+                    mName = group.name + ' Owner';
+                } else {
+                    mName = 'Group Member';
+                }
             }
         }
 
-        if (e.user_id === user?.id) {
+        if (isSelf && !mName.includes('(You)')) {
             mName += ' (You)';
         }
 

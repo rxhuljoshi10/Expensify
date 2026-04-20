@@ -26,11 +26,20 @@ function AuthGuard() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const isSetup = segments[0] === 'onboarding';
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (session && inAuthGroup) {
-      router.replace('/(tabs)/home');
+    } else if (session) {
+      const hasName = !!session.user.user_metadata?.full_name;
+      
+      if (!hasName && !isSetup) {
+        // Needs onboarding
+        router.replace('/onboarding');
+      } else if (hasName && (inAuthGroup || isSetup)) {
+        // Logged in and set up -> go to home 
+        router.replace('/(tabs)/home');
+      }
     }
   }, [session, isLoading, segments]);
 

@@ -54,11 +54,19 @@ export default function MemberSpendingBar({ members, periodTotal }: Props) {
                     const pct = periodTotal > 0 ? Math.round((m.total / periodTotal) * 100) : 0;
                     return (
                         <View key={m.id} style={styles.legendRow}>
-                            <View style={[styles.dot, { backgroundColor: MEMBER_COLORS[i % MEMBER_COLORS.length] }]} />
-                            <Text style={styles.memberName} numberOfLines={1}>{m.name}</Text>
-                            <Text style={styles.memberCount}>{m.count} expenses</Text>
-                            <Text style={styles.memberAmount}>{formatAmount(m.total)}</Text>
-                            <Text style={styles.memberPct}>{pct}%</Text>
+                            <View style={styles.colName}>
+                                <View style={[styles.dot, { backgroundColor: MEMBER_COLORS[i % MEMBER_COLORS.length] }]} />
+                                <Text style={styles.memberName} numberOfLines={1}>{m.name}</Text>
+                            </View>
+                            <View style={styles.colCount}>
+                                <Text style={styles.memberCount}>{m.count} {m.count === 1 ? 'txn' : 'txns'}</Text>
+                            </View>
+                            <View style={styles.colAmount}>
+                                <Text style={styles.memberAmount}>{formatAmount(m.total)}</Text>
+                            </View>
+                            <View style={styles.colPct}>
+                                <Text style={styles.memberPct}>{pct}%</Text>
+                            </View>
                         </View>
                     );
                 })}
@@ -78,14 +86,18 @@ function createStyles(theme: Theme) {
         barSegment: { height: '100%' },
         legendRow: {
             flexDirection: 'row', alignItems: 'center',
-            paddingVertical: 8, gap: 8,
-            borderBottomWidth: 0.5, borderColor: theme.separator,
+            paddingVertical: 6,
         },
-        dot: { width: 10, height: 10, borderRadius: 5 },
-        memberName: { flex: 1, fontSize: 14, color: theme.text, fontWeight: '500' },
-        memberCount: { fontSize: 12, color: theme.textSecondary },
-        memberAmount: { fontSize: 14, fontWeight: '600', color: theme.text },
-        memberPct: { fontSize: 12, color: theme.textSecondary, width: 32, textAlign: 'right' },
+        colName: { flex: 3.5, flexDirection: 'row', alignItems: 'center', gap: 6 },
+        colCount: { flex: 1.5, alignItems: 'flex-start' },
+        colAmount: { flex: 2.2, alignItems: 'flex-end' },
+        colPct: { width: 35, alignItems: 'flex-end' },
+        
+        dot: { width: 8, height: 8, borderRadius: 4 },
+        memberName: { flex: 1, fontSize: 13, color: theme.text, fontWeight: '500' },
+        memberCount: { fontSize: 11, color: theme.textSecondary },
+        memberAmount: { fontSize: 13, fontWeight: '600', color: theme.text },
+        memberPct: { fontSize: 11, color: theme.textSecondary },
         empty: { padding: 24, alignItems: 'center' },
         emptyText: { color: theme.textSecondary, fontSize: 14 },
     });

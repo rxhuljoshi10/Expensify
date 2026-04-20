@@ -24,12 +24,12 @@ export default function ExpenseRow({ expense, onPress, onLongPress }: Props) {
             </View>
             <View style={styles.info}>
                 <Text style={styles.merchant} numberOfLines={1}>{expense.merchant}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, paddingRight: 8 }}>
                     <Text style={styles.category}>{expense.category}</Text>
                     {(expense as any).member_name && (
                         <>
                             <Text style={styles.dotSeparator}>•</Text>
-                            <Text style={styles.memberBadge}>👤 {(expense as any).member_name}</Text>
+                            <Text style={styles.memberBadge} numberOfLines={1}>👤 {(expense as any).member_name}</Text>
                         </>
                     )}
                 </View>
@@ -57,8 +57,8 @@ function createStyles(theme: Theme) {
         merchant: { fontSize: 15, fontWeight: '500', color: theme.text },
         category: { fontSize: 13, color: theme.textSecondary },
         dotSeparator: { fontSize: 10, color: theme.textSecondary, marginHorizontal: 6, marginTop: 1 },
-        memberBadge: { fontSize: 11, fontWeight: '500', color: theme.primary, backgroundColor: theme.primary + '11', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
-        right: { alignItems: 'flex-end' },
+        memberBadge: { flexShrink: 1, fontSize: 11, fontWeight: '500', color: theme.primary, backgroundColor: theme.primary + '11', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
+        right: { alignItems: 'flex-end', flexShrink: 0 },
         amount: { fontSize: 15, fontWeight: '600', color: theme.text },
         date: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
     });
