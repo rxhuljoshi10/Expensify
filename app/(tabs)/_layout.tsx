@@ -27,6 +27,9 @@ export default function TabsLayout() {
           fontSize: 11,
           fontWeight: '600',
         },
+        sceneContainerStyle: {
+          backgroundColor: theme.background,
+        },
       }}
     >
       <Tabs.Screen

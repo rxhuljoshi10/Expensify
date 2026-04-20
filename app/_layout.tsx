@@ -1,12 +1,14 @@
-// app/_layout.tsx
 import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import Toast from 'react-native-toast-message';
 import OfflineBanner from '../components/OfflineBanner';
+import { useTheme } from '../lib/theme';
+import { ThemeProvider, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 
 const queryClient = new QueryClient();
 
@@ -15,6 +17,7 @@ function AuthGuard() {
   const { loadSettings } = useSettingsStore();
   const segments = useSegments();
   const router = useRouter();
+  const theme = useTheme();
 
   useEffect(() => {
     loadSettings();
@@ -44,25 +47,53 @@ function AuthGuard() {
   }, [session, isLoading, segments]);
 
   // Block rendering until we know the auth state.
-  // Without this, Expo Router shows the login screen briefly
-  // even when the user has a valid persisted session.
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-        <ActivityIndicator size="large" color="#6366f1" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
 
-  return <Slot />;
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: theme.background },
+        animation: 'none',
+      }}
+    />
+  );
 }
 
 export default function RootLayout() {
+  const theme = useTheme();
+  const colorScheme = useSettingsStore(state => state.theme);
+  const isDark = colorScheme === 'dark';
+  
+  const navTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    dark: isDark,
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      background: theme.background,
+      card: theme.surface,
+      text: theme.text,
+      border: theme.border,
+      primary: theme.primary,
+    },
+  };
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthGuard />
-      <OfflineBanner />
-      <Toast />
-    </QueryClientProvider>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={theme.background} />
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider value={navTheme}>
+          <AuthGuard />
+          <OfflineBanner />
+          <Toast />
+        </ThemeProvider>
+      </QueryClientProvider>
+    </View>
   );
 }
