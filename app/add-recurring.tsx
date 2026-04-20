@@ -1,5 +1,6 @@
 // app/add-recurring.tsx
 import { useState } from 'react';
+import { getLocalISODate } from '../lib/date';
 import {
     View, Text, TextInput, TouchableOpacity,
     StyleSheet, ScrollView, KeyboardAvoidingView,
@@ -30,9 +31,7 @@ export default function AddRecurringScreen() {
     const [merchant, setMerchant] = useState('');
     const [category, setCategory] = useState<Category>('Bills');
     const [frequency, setFrequency] = useState<RecurringFrequency>('monthly');
-    const [startDate, setStartDate] = useState(
-        new Date().toISOString().split('T')[0]
-    );
+    const [startDate, setStartDate] = useState(getLocalISODate());
     const [errors, setErrors] = useState<{ amount?: string; merchant?: string }>({});
 
     const validate = (): boolean => {

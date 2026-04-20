@@ -1,5 +1,6 @@
 // app/edit-expense.tsx
 import { useState, useEffect } from 'react';
+import { getLocalISODate } from '../lib/date';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { toast } from '../lib/toast';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -46,7 +47,7 @@ export default function EditExpenseScreen() {
         updateExpense({
             id, amount: rupeesToPaise(parsed), category,
             merchant: merchant.trim(), description: description.trim(),
-            expense_date: date.toISOString().split('T')[0],
+            expense_date: getLocalISODate(date),
         }, {
             onSuccess: () => { toast.success('Expense updated'); router.back(); },
             onError: (e) => { toast.error(e.message); },

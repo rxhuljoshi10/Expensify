@@ -13,6 +13,7 @@ import { rupeesToPaise } from '../../lib/currency';
 import { Category } from '../../types/expense';
 import { useTheme, Theme } from '../../lib/theme';
 import { categorizeExpense, parseVoiceExpense, pickAndScanBill } from '../../lib/ai';
+import { getLocalISODate } from '../../lib/date';
 import { Ionicons } from '@expo/vector-icons';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 
@@ -91,7 +92,7 @@ export default function AddExpenseScreen() {
         }
 
         try {
-            const today = new Date().toISOString();
+            const today = getLocalISODate();
             await Promise.all(
                 multipleExpenses.map(exp =>
                     addExpenseAsync({
@@ -137,7 +138,7 @@ export default function AddExpenseScreen() {
             category,
             merchant: merchant.trim(),
             description: description.trim(),
-            expense_date: date.toISOString().split('T')[0],
+            expense_date: getLocalISODate(date),
         }, {
             onSuccess: () => {
                 toast.success('Expense added');
