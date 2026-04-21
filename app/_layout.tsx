@@ -12,18 +12,47 @@ import { StatusBar } from 'expo-status-bar';
 
 const queryClient = new QueryClient();
 
+import { useInsightStore } from '../store/insightStore';
+import { supabase } from '../lib/supabase';
+
 function AuthGuard() {
   const { session, isLoading, initialize } = useAuthStore();
   const { loadSettings } = useSettingsStore();
   const segments = useSegments();
   const router = useRouter();
   const theme = useTheme();
+  const { triggerGeneration, isGenerating } = useInsightStore();
 
   useEffect(() => {
     loadSettings();
     const unsubscribe = initialize();
     return () => unsubscribe?.();
   }, []);
+
+  // Global Auto-Trigger Logic
+  useEffect(() => {
+    if (isLoading || !session?.user?.id || isGenerating) return;
+
+    const checkAndTrigger = async () => {
+      // Check latest insight date
+      const { data: latest } = await supabase
+        .from('insights')
+        .select('generated_at')
+        .eq('user_id', session.user.id)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const shouldTrigger = !latest || 
+        (new Date().getTime() - new Date(latest.generated_at).getTime() > 24 * 60 * 60 * 1000);
+
+      if (shouldTrigger) {
+        triggerGeneration(session.user.id);
+      }
+    };
+
+    checkAndTrigger();
+  }, [session?.user?.id, isLoading]);
 
   useEffect(() => {
     if (isLoading) return;

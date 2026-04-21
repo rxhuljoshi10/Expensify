@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
@@ -11,6 +11,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+import { useInsightStore } from '../store/insightStore';
+import TypewriterText from './TypewriterText';
+
 export default function InsightCard() {
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
@@ -18,7 +21,10 @@ export default function InsightCard() {
     const theme = useTheme();
     const styles = createStyles(theme);
 
-    const { data: insight } = useQuery({
+    // Global state
+    const { liveBriefing, clearLiveBriefing } = useInsightStore();
+
+    const { data: insight, isLoading: isQueryLoading } = useQuery({
         queryKey: ['insight', user?.id],
         queryFn: async () => {
             const { data } = await supabase
@@ -44,7 +50,11 @@ export default function InsightCard() {
         onSettled: () => queryClient.invalidateQueries({ queryKey: ['insight'] }),
     });
 
-    if (!insight || insight.is_read) return null;
+
+    const displayContent = liveBriefing || insight?.content;
+    const isNew = !!liveBriefing || (insight && !insight.is_read);
+
+    if (!displayContent) return null;
 
     return (
         <View style={styles.card}>
@@ -52,25 +62,41 @@ export default function InsightCard() {
                 <View style={styles.headerLeft}>
                     <Ionicons name="sparkles" size={18} color={theme.primary} />
                     <Text style={styles.label}>AI Insight</Text>
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>NEW</Text>
-                    </View>
+                    {isNew && (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>NEW</Text>
+                        </View>
+                    )}
                 </View>
-                <TouchableOpacity 
-                    onPress={() => markRead(insight.id)} 
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                    style={styles.closeBtn}
-                >
-                    <Ionicons name="close" size={20} color={theme.textSecondary} />
-                </TouchableOpacity>
+                {insight?.id && (
+                    <TouchableOpacity 
+                        onPress={() => markRead(insight.id)} 
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        style={styles.closeBtn}
+                    >
+                        <Ionicons name="close" size={20} color={theme.textSecondary} />
+                    </TouchableOpacity>
+                )}
             </View>
             <TouchableOpacity 
                 activeOpacity={0.7} 
                 onPress={() => router.push('/(tabs)/assistant')}
             >
-                <Text style={styles.content}>{insight.content}</Text>
+                {liveBriefing ? (
+                    <TypewriterText 
+                        text={liveBriefing} 
+                        style={styles.content} 
+                        onComplete={async () => {
+                            await queryClient.invalidateQueries({ queryKey: ['insight'] });
+                            clearLiveBriefing();
+                        }}
+                    />
+                ) : (
+                    <Text style={styles.content}>{insight?.content}</Text>
+                )}
+                
                 <View style={styles.readMoreRow}>
-                    <Text style={styles.readMoreText}>Read more to view all insights</Text>
+                    <Text style={styles.readMoreText}>Open full report</Text>
                     <Ionicons name="arrow-forward" size={14} color={theme.primary} />
                 </View>
             </TouchableOpacity>
@@ -134,6 +160,11 @@ const createStyles = (theme: Theme) => StyleSheet.create({
         color: theme.text, 
         lineHeight: 24,
         fontWeight: '500',
+    },
+    generatingText: {
+        fontSize: 14,
+        color: theme.textSecondary,
+        fontStyle: 'italic',
     },
     readMoreRow: {
         flexDirection: 'row',

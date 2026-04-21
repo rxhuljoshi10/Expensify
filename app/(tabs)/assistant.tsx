@@ -6,7 +6,9 @@ import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useTheme, Theme } from '../../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+import { useInsightStore } from '../../store/insightStore';
 
 export default function AssistantScreen() {
     const { user } = useAuthStore();
@@ -14,7 +16,9 @@ export default function AssistantScreen() {
     const theme = useTheme();
     const styles = createStyles(theme);
     const queryClient = useQueryClient();
-    const [isGenerating, setIsGenerating] = useState(false);
+    
+    // Global state
+    const { isGenerating, triggerGeneration } = useInsightStore();
 
     const { data: insights = [], isLoading, refetch, isRefetching } = useQuery({
         queryKey: ['all-insights', user?.id],
@@ -29,20 +33,10 @@ export default function AssistantScreen() {
         enabled: !!user,
     });
 
-    const triggerGeneration = async () => {
-        if (isGenerating) return;
-        setIsGenerating(true);
-        try {
-            const { data, error } = await supabase.functions.invoke('generate-insights', {
-                body: { userId: user?.id }
-            });
-            if (error) throw error;
-            await refetch();
-        } catch (e) {
-            console.error('Generation failed:', e);
-        } finally {
-            setIsGenerating(false);
-        }
+    const handleRefresh = async () => {
+        if (!user) return;
+        await triggerGeneration(user.id);
+        refetch(); // Invalidate and refetch local query after global generation
     };
 
     const latestInsight = insights.find(i => i.type === 'coaching_briefing') || insights[0];
@@ -93,7 +87,7 @@ export default function AssistantScreen() {
                     </View>
                     <TouchableOpacity 
                         style={[styles.refreshBtn, isGenerating && styles.disabled]} 
-                        onPress={triggerGeneration}
+                        onPress={handleRefresh}
                         disabled={isGenerating}
                     >
                         {isGenerating ? (

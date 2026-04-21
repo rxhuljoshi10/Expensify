@@ -97,9 +97,13 @@ serve(async (req) => {
   "anomaly": "Insight or null",
   "tip": "Action tip."
 }
+
+CRITICAL INSTRUCTION: Ensure the briefing and tips are highly varied and different on every request. Keep it conversational.
+Current Date: ${new Date().toLocaleDateString()}
+
 DATA:
 ${context}` }] }],
-                            generationConfig: { responseMimeType: "application/json" }
+                            generationConfig: { responseMimeType: "application/json", temperature: 1.0 }
                         }),
                     },
                 );
