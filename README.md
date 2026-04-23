@@ -41,38 +41,34 @@ In a world full of basic budgeting apps, Expensify stands out by eliminating the
 - **Personal ↔ Family Toggle:** Instantly switch between personal and group spending when actively part of a family group.
 - **Member Spending Bar:** See exactly how much each group member has contributed in the group view.
 
-### 2. ➕ Frictionless Expense Input
+### 2. ➕ Frictionless & Next-Gen Expense Input
 - **Manual Form:** Clean UI with an AI category auto-suggest mapping categories dynamically to the merchant name you type.
-- **Bill/Receipt Scanner:** Take a photo or select an image from your gallery; Gemini Vision extracts merchant, total, date, items, and category.
+- **Next-Gen Voice Input:** Tap the microphone and speak naturally: *"Took an Uber ride for 320 rupees."* Audio is securely parsed and the expense is automatically categorized and saved.
+- **Bill/Receipt Scanner:** Snap a photo of your receipt; Gemini Vision natively extracts merchant, total, date, items, and category.
 - **Granular Editing:** Fully edit transactions manually if AI misses the mark.
 
-### 3. 🎤 Next-Gen Voice Input
-- Tap the microphone button and speak naturally: *"Took an Uber ride for 320 rupees."*
-- Audio is compiled and securely sent to the `parse-voice-expense` Supabase Edge Function.
-- The expense is safely categorized, auto-saved, and you instantly return to your dashboard.
-
-### 4. 🤖 Google Gemini AI Integrations
+### 3. 🤖 Google Gemini AI Integrations
 - **AI Chat Assistant (`/ai-bot`):** A conversational interface where you can ask anything about your spending history. (e.g. *"Did I spend too much on food this week?"*)
 - **Insights Feed:** Lists all proactively generated insights (daily / weekly / monthly summaries) in reverse chronological order.
 - **Smart Formatting:** Complete with typing indicators and conversational chips to jumpstart prompts.
 
-### 5. 🔄 Subscription & Recurring Expenses
+### 4. 🔄 Subscription & Recurring Expenses
 - Define daily / weekly / monthly / yearly recurring expenses (rent, Netflix, gym, EMIs).
 - Toggle active/paused states universally per item.
 - Adaptive due-date badges (overdue, due today, due in N days) directly notifying the home screen.
 
-### 6. 👨‍👩‍👧 Seamless Family Groups
+### 5. 👨‍👩‍👧 Seamless Family Groups
 - Create a new group and share an auto-generated, secure 6-character invite code.
 - Join an existing family group securely.
 - Powered natively by Supabase Row Level Security (RLS) policies allowing for cross-member expense visibility without compromising personal database constraints.
 
-### 7. 🗂️ Advanced Searching, Filtering & Exporting
+### 6. 🗂️ Advanced Searching, Filtering & Exporting
 - **Chronological List:** View fully detailed expense lists.
 - **Real-Time Search:** Search natively by Merchant or Description.
 - **Dynamic Timeline Filter:** An advanced Action Sheet categorizes and filters historical items natively by exact months or 'Older Expenses'.
 - **Export to CSV:** Fully download and share your financial data to external applications with a tap on the profile screen.
 
-### 8. 🌗 Theme System & Settings
+### 7. 🌗 Theme System & Settings
 - **Gorgeous UI:** Glassmorphism and modern gradient styling integrated directly into a responsive mobile layout.
 - **Dark Mode Engine:** A completely flexible `useTheme()` engine dynamically handles styling tokens.
 - **Customizable Budgets:** Set specific limits across your spending to track against.
@@ -83,16 +79,10 @@ In a world full of basic budgeting apps, Expensify stands out by eliminating the
 
 | Layer | Technology |
 |---|---|
-| **Framework** | React Native + Expo (SDK 54) |
-| **Routing** | Expo Router v6 (File-based mapping) |
-| **Backend & DB** | Supabase (PostgreSQL + RLS) |
-| **Authentication** | Supabase Auth |
-| **State Management** | Zustand (Global layout state) |
-| **Data Caching** | TanStack React Query v5 |
-| **Artificial Intelligence**| Google Gemini API (via Edge Functions) |
-| **Iconography** | `@expo/vector-icons` (Ionicons) |
-| **Charting** | `react-native-chart-kit` + `victory-native` |
-| **Native APIs** | `expo-audio`, `expo-image-picker`, `expo-file-system`, `expo-sharing` |
+| **Frontend** | React Native + Expo |
+| **Backend & Auth** | Supabase (PostgreSQL, Edge Functions, Google Auth) |
+| **AI/ML** | Google Gemini API, Vision API, Speech-to-Text |
+| **State & Data** | Zustand, React Query |
 
 ---
 
@@ -116,9 +106,9 @@ All AI and heavy-lifting logic runs securely off-client using Deno-based Supabas
 ### Prerequisites
 
 - Node.js ≥ 18
-- Expo CLI (`npm install -g expo-cli`)
-- Supabase account & project
-- Google Gemini API key
+- Supabase account & CLI
+- Google Cloud Console account (for Gemini API, Vision API, and Speech-to-Text)
+- Google OAuth Client ID (for Authentication)
 
 ### 1. Clone & install
 
@@ -135,12 +125,15 @@ Create a `.env` file in the project root:
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=<your-google-oauth-client-id>
 ```
 
-Set the Gemini API key as a Supabase secret:
+Set the Google API keys as Supabase secrets for your Edge Functions:
 
 ```bash
 supabase secrets set GEMINI_API_KEY=<your-gemini-key>
+supabase secrets set GOOGLE_VISION_API_KEY=<your-vision-api-key>
+supabase secrets set GOOGLE_SPEECH_API_KEY=<your-speech-api-key>
 ```
 
 ### 3. Deploy Edge Functions
@@ -164,19 +157,6 @@ Scan the QR code with Expo Go (Android) or the Camera app (iOS) to launch!
 
 ---
 
-## 🧭 Roadmap / Known Limitations
-
-- [x] Export expenses as CSV 
-- [x] Integrate Gemini AI extensively
-- [ ] Multi-currency parsing logic support
-- [ ] Dynamic Light mode implementation mapping (Light UI tokens are written but locked natively)
-- [ ] Widget integrations for iOS / Android Home Screens
-- [ ] Fully automated `generate-insights` chron scheduling (Currently triggered contextually)
-
----
-
 ## 📄 License & Attribution
 
 This project is private and not currently licensed for public distribution.
-
-*Built with ❤️ utilizing Expo, Supabase, and Google Gemini.*
