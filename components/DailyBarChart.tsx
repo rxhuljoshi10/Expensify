@@ -189,9 +189,9 @@ export default function DailyBarChart({ historicalWeeksData }: Props) {
                                                 onPress={() => handleBarPress(d.date, isBlank)}
                                             >
                                                 <View style={styles.barTrack}>
-                                                    {isActive && !isBlank && rupees > 0 && (
+                                                    {isActive && !isBlank && (
                                                         <Text style={styles.floatingTotal} numberOfLines={1} adjustsFontSizeToFit>
-                                                            {formatAmount(d.total)}
+                                                            {d.total > 0 ? formatAmount(d.total) : '₹0'}
                                                         </Text>
                                                     )}
                                                     {!isBlank && (
