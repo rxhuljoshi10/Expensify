@@ -1,6 +1,19 @@
-# 💸 Expensify
+# 💸 Expensify: The Ultimate AI-Powered Financial Coach
 
-A feature-rich personal and family expense tracking app built with **React Native (Expo)** and powered by **Supabase** as the backend. Expensify helps you log, visualize, and understand your spending habits — with AI-powered insights, voice input, bill scanning, and collaborative family group tracking.
+A beautifully designed, feature-rich personal and family expense tracking app built with **React Native (Expo)** and powered by **Supabase**. Expensify isn't just a ledger to record past transactions; it's a proactive financial assistant. It helps you log, visualize, and understand your spending habits via a premium user interface, AI-powered insights, voice input, receipt scanning, and collaborative family tracking.
+
+---
+
+## 🌟 Why Expensify? (The Value Proposition)
+
+In a world full of basic budgeting apps, Expensify stands out by eliminating the friction of manual data entry and transforming raw numbers into actionable financial wisdom. 
+
+**Why will people use it?**
+1. **Frictionless Logging:** Hate typing out expenses? Tap the microphone and say, *"I spent 480 rupees on Swiggy for dinner."* The AI parses the amount, merchant, and category instantly. Have a receipt? Snap a picture and Gemini Vision extracts all the structured data for you.
+2. **AI Financial Coach:** Most apps tell you *what* you spent. Expensify tells you *how to improve*. Our integrated Gemini AI acts as a personal financial advisor, analyzing your trends and suggesting real-time actionable insights to save money.
+3. **Built for Modern Families:** Finances are often shared. Expensify allows you to seamlessly switch between a "Personal" view and a "Family Group" view. Spouses and family members can track communal spending perfectly organized by member contributions, synced in real-time.
+4. **Premium Aesthetics:** Budgeting shouldn't feel like a chore. The application features a stunning glassmorphism design, harmonious dark mode, smooth micro-animations, and responsive feedback that makes tracking your money genuinely delightful.
+5. **Your Data, Your Control:** Advanced filtering by timeline and robust CSV data exporting means your financial data isn't trapped in the app. You can extract it whenever you need to process it on your own terms.
 
 ---
 
@@ -16,68 +29,53 @@ A feature-rich personal and family expense tracking app built with **React Nativ
 
 ---
 
-## ✨ Feature Overview
+## ✨ Comprehensive Feature Matrix
 
-### 🏠 Home Dashboard
-- **Time-period stats** — Today / This Week / This Month totals at a glance
-- **Spending Pie Chart** — Category breakdown for the selected period
-- **Daily Bar Chart** — Historical weekly spending trend
-- **Budget Card** — Visual progress bar vs monthly budget, with category-level limits
-- **AI Insight Card** — Latest AI-generated spending insight shown inline
-- **Recurring nudge** — Alerts when recurring expenses are due today
-- **Personal ↔ Family view toggle** — Switch between personal and group spending when in a family group
-- **Member Spending Bar** — See how much each group member has spent in group view
-- **Pull-to-refresh** — Instant data refresh with React Query cache invalidation
+### 1. 🏠 The Command Center (Home Dashboard)
+- **Time-Period Stats:** Real-time visual cards for Today, This Week, and This Month totals.
+- **Spending Pie Chart:** Immediate category breakdown for the selected period.
+- **Daily Bar Chart:** Historical weekly spending trend to identify peak expenditure days.
+- **Budget Card:** Visual progress bar tracking your speed against a dynamic monthly budget, with specific category-level limits.
+- **AI Insight Card:** Your latest personalized AI-generated spending insight shown inline.
+- **Recurring Nudge:** Priority alerts when your subscriptions or recurring expenses are due today.
+- **Personal ↔ Family Toggle:** Instantly switch between personal and group spending when actively part of a family group.
+- **Member Spending Bar:** See exactly how much each group member has contributed in the group view.
 
-### ➕ Add Expense
-- Manual form: amount (₹), merchant name, category, date, notes
-- **AI category auto-suggest** — debounced call to Gemini as you type the merchant name
-- **Bill scanner** — Take a photo or use gallery; AI extracts merchant, total, date, items, and category from the receipt
-- Form validation with inline errors
+### 2. ➕ Frictionless Expense Input
+- **Manual Form:** Clean UI with an AI category auto-suggest mapping categories dynamically to the merchant name you type.
+- **Bill/Receipt Scanner:** Take a photo or select an image from your gallery; Gemini Vision extracts merchant, total, date, items, and category.
+- **Granular Editing:** Fully edit transactions manually if AI misses the mark.
 
-### 🔄 Recurring Expenses
-- Define daily / weekly / monthly / yearly recurring expenses (rent, subscriptions, EMIs)
-- Toggle active/paused state per item
-- Due-date badge (overdue / due today / due in N days)
-- Accessible via a nudge on the Home screen when items are due
+### 3. 🎤 Next-Gen Voice Input
+- Tap the microphone button and speak naturally: *"Took an Uber ride for 320 rupees."*
+- Audio is compiled and securely sent to the `parse-voice-expense` Supabase Edge Function.
+- The expense is safely categorized, auto-saved, and you instantly return to your dashboard.
 
-### 🎤 Voice Input
-- Tap the mic button and speak naturally: _"Spent 480 on Swiggy"_ or _"Uber ride ₹320"_
-- Audio is sent to the `parse-voice-expense` Supabase Edge Function (powered by Gemini)
-- Expense is auto-saved and user returns to the previous screen
-- Animated pulse effect while recording
+### 4. 🤖 Google Gemini AI Integrations
+- **AI Chat Assistant (`/ai-bot`):** A conversational interface where you can ask anything about your spending history. (e.g. *"Did I spend too much on food this week?"*)
+- **Insights Feed:** Lists all proactively generated insights (daily / weekly / monthly summaries) in reverse chronological order.
+- **Smart Formatting:** Complete with typing indicators and conversational chips to jumpstart prompts.
 
-### 🤖 AI Insights Screen
-- Lists all AI-generated insights (daily / weekly / monthly summaries) in reverse chronological order
-- Pull-to-refresh for new insights
-- Color-coded cards with Ionicons
-- Floating **"Ask AI Assistant"** button to open the chatbot
+### 5. 🔄 Subscription & Recurring Expenses
+- Define daily / weekly / monthly / yearly recurring expenses (rent, Netflix, gym, EMIs).
+- Toggle active/paused states universally per item.
+- Adaptive due-date badges (overdue, due today, due in N days) directly notifying the home screen.
 
-### 💬 AI Chat Assistant (`/ai-bot`)
-- Conversational interface: ask anything about your spending history
-- Canned suggestion chips to get started quickly
-- Powered by the `ai-assistant` Supabase Edge Function (Gemini)
-- Typing indicator while waiting for response
+### 6. 👨‍👩‍👧 Seamless Family Groups
+- Create a new group and share an auto-generated, secure 6-character invite code.
+- Join an existing family group securely.
+- Powered natively by Supabase Row Level Security (RLS) policies allowing for cross-member expense visibility without compromising personal database constraints.
 
-### 📊 Expenses List
-- Full chronological list of all expenses
-- Filterable by period; edit & delete each row
+### 7. 🗂️ Advanced Searching, Filtering & Exporting
+- **Chronological List:** View fully detailed expense lists.
+- **Real-Time Search:** Search natively by Merchant or Description.
+- **Dynamic Timeline Filter:** An advanced Action Sheet categorizes and filters historical items natively by exact months or 'Older Expenses'.
+- **Export to CSV:** Fully download and share your financial data to external applications with a tap on the profile screen.
 
-### 👨‍👩‍👧 Family Groups
-- Create a new group and share the auto-generated 6-character invite code
-- Join an existing group with a code
-- View all members; owner can remove members
-- Member-level spending breakdown shown on the Home dashboard
-- Powered by Supabase RLS policies for cross-member expense visibility
-
-### 👤 Profile & Budget Settings
-- View and update profile info
-- Set a **total monthly budget** and optional **per-category limits** (₹)
-- Budget card on Home visualizes current spend vs limit
-
-### 🌗 Theme System
-- Full **dark mode** (currently hardcoded dark; light theme defined and ready)
-- All components consume a `useTheme()` hook — zero hardcoded colors
+### 8. 🌗 Theme System & Settings
+- **Gorgeous UI:** Glassmorphism and modern gradient styling integrated directly into a responsive mobile layout.
+- **Dark Mode Engine:** A completely flexible `useTheme()` engine dynamically handles styling tokens.
+- **Customizable Budgets:** Set specific limits across your spending to track against.
 
 ---
 
@@ -86,106 +84,30 @@ A feature-rich personal and family expense tracking app built with **React Nativ
 | Layer | Technology |
 |---|---|
 | **Framework** | React Native + Expo (SDK 54) |
-| **Navigation** | Expo Router v6 (file-based routing) |
-| **Backend / DB** | Supabase (PostgreSQL + RLS) |
-| **Auth** | Supabase Auth (email/password) |
-| **State Management** | Zustand (auth + dashboard view mode) |
-| **Server State / Caching** | TanStack React Query v5 |
-| **AI / ML** | Google Gemini API (via Supabase Edge Functions) |
-| **Icons** | `@expo/vector-icons` — Ionicons |
-| **Charts** | `react-native-chart-kit` + `victory-native` |
-| **Audio Recording** | `expo-audio` |
-| **Camera / Image** | `expo-image-picker` + `expo-image-manipulator` |
-| **Haptics** | `expo-haptics` |
-| **Notifications** | `expo-notifications` |
-| **Toasts** | `react-native-toast-message` |
-| **Storage** | `expo-secure-store`, `@react-native-async-storage/async-storage` |
-| **Offline Detection** | `@react-native-community/netinfo` + `OfflineBanner` component |
+| **Routing** | Expo Router v6 (File-based mapping) |
+| **Backend & DB** | Supabase (PostgreSQL + RLS) |
+| **Authentication** | Supabase Auth |
+| **State Management** | Zustand (Global layout state) |
+| **Data Caching** | TanStack React Query v5 |
+| **Artificial Intelligence**| Google Gemini API (via Edge Functions) |
+| **Iconography** | `@expo/vector-icons` (Ionicons) |
+| **Charting** | `react-native-chart-kit` + `victory-native` |
+| **Native APIs** | `expo-audio`, `expo-image-picker`, `expo-file-system`, `expo-sharing` |
 
 ---
 
 ## ☁️ Supabase Edge Functions
 
-All AI and heavy-lifting logic runs as Deno-based Supabase Edge Functions:
+All AI and heavy-lifting logic runs securely off-client using Deno-based Supabase Edge Functions:
 
 | Function | Purpose |
 |---|---|
-| `categorize-expense` | Given a merchant name, returns the best-matching spending category |
-| `parse-voice-expense` | Receives an audio file, transcribes it and extracts amount / merchant / category |
-| `scan-bill` | Receives a base64 image of a receipt, uses Gemini Vision to extract structured data |
-| `generate-insights` | Periodically generates daily / weekly / monthly AI summaries and stores them in the `insights` table |
-| `ai-assistant` | Handles conversational Q&A about the user's expense history |
-| `send-notifications` | Sends push notifications (e.g. recurring expense reminders) |
-
----
-
-## 📂 Project Structure
-
-```
-expensify/
-├── app/
-│   ├── (auth)/           # Login & Signup screens
-│   │   ├── login.tsx
-│   │   └── signup.tsx
-│   ├── (tabs)/           # Main tab navigator
-│   │   ├── _layout.tsx   # Tab bar config (Ionicons icons)
-│   │   ├── home.tsx      # Main dashboard
-│   │   ├── expenses.tsx  # Expense list
-│   │   ├── add.tsx       # Add expense form
-│   │   ├── voice.tsx     # Voice input screen
-│   │   ├── assistant.tsx # AI Insights + chat FAB
-│   │   └── profile.tsx   # User profile
-│   ├── _layout.tsx       # Root layout (auth guard)
-│   ├── ai-bot.tsx        # AI chat screen
-│   ├── add-recurring.tsx # Add recurring expense form
-│   ├── recurring.tsx     # Recurring expenses list
-│   ├── budget-settings.tsx
-│   ├── edit-expense.tsx
-│   └── family.tsx        # Family group management
-├── components/           # Reusable UI components
-│   ├── BudgetCard.tsx
-│   ├── CategoryPicker.tsx
-│   ├── DailyBarChart.tsx
-│   ├── DashboardInsights.tsx
-│   ├── DashboardSkeleton.tsx
-│   ├── ExpenseListSkeleton.tsx
-│   ├── ExpenseRow.tsx
-│   ├── InsightCard.tsx
-│   ├── MemberSpendingBar.tsx
-│   ├── OfflineBanner.tsx
-│   ├── RecentExpenses.tsx
-│   ├── SkeletonLoader.tsx
-│   ├── SpendingPieChart.tsx
-│   └── StatCard.tsx
-├── constants/
-│   └── categories.ts     # 12 categories with Ionicons name + color
-├── hooks/                # Custom React Query hooks
-│   ├── useBudget.ts
-│   ├── useDashboardStats.ts
-│   ├── useExpenses.ts
-│   ├── useFamilyGroup.ts
-│   ├── useRecurring.ts
-│   └── useVoiceRecorder.ts
-├── lib/                  # Utility / service layer
-│   ├── ai.ts             # categorizeExpense, parseVoiceExpense, pickAndScanBill
-│   ├── currency.ts       # rupeesToPaise / formatAmount helpers
-│   ├── haptic.ts
-│   ├── supabase.ts       # Supabase client
-│   ├── theme.ts          # Light + Dark theme tokens + useTheme hook
-│   └── toast.ts
-├── store/
-│   ├── authStore.ts      # Zustand auth state
-│   └── dashboardStore.ts # Zustand view mode (personal / group)
-├── supabase/
-│   └── functions/        # Edge Functions (Deno)
-│       ├── ai-assistant/
-│       ├── categorize-expense/
-│       ├── generate-insights/
-│       ├── parse-voice-expense/
-│       ├── scan-bill/
-│       └── send-notifications/
-└── types/                # Shared TypeScript types
-```
+| `categorize-expense` | Returns the best-matching spending category for a merchant |
+| `parse-voice-expense` | Transcribes audio and extracts the structured expense payload |
+| `scan-bill` | Receives a base64 receipt image, leveraging Gemini Vision to extract totals and context |
+| `generate-insights` | Synthesizes daily/weekly/monthly summaries into the `insights` feed |
+| `ai-assistant` | The brain behind the conversational Q&A interacting with your expense history |
+| `send-notifications` | Dispatches push notifications for due tasks or warnings |
 
 ---
 
@@ -238,52 +160,23 @@ supabase functions deploy send-notifications
 npx expo start --clear
 ```
 
-Scan the QR code with Expo Go (Android) or the Camera app (iOS).
-
----
-
-## 🗃 Supabase Database Schema (Overview)
-
-| Table | Purpose |
-|---|---|
-| `expenses` | Individual expense records (user_id, amount in paise, category, merchant, date) |
-| `recurring_expenses` | Recurring expense templates with frequency + next_due_date |
-| `budgets` | Monthly budget per user (total + per-category limits in paise) |
-| `insights` | AI-generated insight records (type: daily/weekly/monthly, content, generated_at) |
-| `family_groups` | Group metadata (name, owner_id, invite_code) |
-| `group_members` | Junction table linking users to groups |
-
-> Row Level Security (RLS) is enabled on all tables. Group members have read access to each other's expenses via a shared group membership policy.
-
----
-
-## 💡 Key Design Decisions
-
-- **Paise everywhere** — All monetary values are stored as integer paise (1 ₹ = 100 paise) to avoid floating-point bugs.
-- **Gemini for all AI** — All three AI functions (categorize, voice parse, bill scan) use the Google Gemini API, migrated from Anthropic Claude.
-- **React Query caching** — Dashboard stats, expenses, budget, recurring, and group data are all cached and invalidated on mutation.
-- **Theming via `useTheme()`** — Every screen and component calls `useTheme()` so the dark → light switch requires a single line change.
-- **Ionicons throughout** — All category and tab-bar icons use Ionicons vector icons for crisp rendering at all sizes.
-- **Background voice processing** — Voice recordings are processed asynchronously so the UI is never blocked.
+Scan the QR code with Expo Go (Android) or the Camera app (iOS) to launch!
 
 ---
 
 ## 🧭 Roadmap / Known Limitations
 
-- [ ] Light mode toggle (theme is currently locked to dark mode)
-- [ ] Export expenses as CSV / PDF
-- [ ] Push notification scheduling for recurring expense reminders
-- [ ] Google / Apple SSO login
-- [ ] Multi-currency support
-- [ ] Widget support (iOS / Android)
-- [ ] Automated `generate-insights` cron job (currently triggered manually)
+- [x] Export expenses as CSV 
+- [x] Integrate Gemini AI extensively
+- [ ] Multi-currency parsing logic support
+- [ ] Dynamic Light mode implementation mapping (Light UI tokens are written but locked natively)
+- [ ] Widget integrations for iOS / Android Home Screens
+- [ ] Fully automated `generate-insights` chron scheduling (Currently triggered contextually)
 
 ---
 
-## 📄 License
+## 📄 License & Attribution
 
 This project is private and not currently licensed for public distribution.
 
----
-
-*Built with ❤️ using Expo, Supabase, and Google Gemini.*
+*Built with ❤️ utilizing Expo, Supabase, and Google Gemini.*

@@ -14,6 +14,9 @@ import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFamilyGroup } from '../../hooks/useFamilyGroup';
 import { useTheme, Theme } from '../../lib/theme';
+import { useExpenses } from '../../hooks/useExpenses';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const AVATAR_PALETTE = ['#6C63FF', '#FF6B6B', '#4ECDC4', '#F7B731', '#A29BFE', '#FD79A8'];
@@ -40,10 +43,13 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const styles = createStyles(theme);
   const { user, signOut } = useAuthStore();
-  const { theme: colorScheme, toggleTheme, notificationsEnabled, setNotificationsEnabled } = useSettingsStore();
+  const colorScheme = useSettingsStore(state => state.theme);
+  const { toggleTheme, notificationsEnabled, setNotificationsEnabled } = useSettingsStore();
+
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: group } = useFamilyGroup();
+  const { data: personalExpenses } = useExpenses();
 
   const [name, setName] = useState<string>(user?.user_metadata?.full_name ?? '');
   const [editingName, setEditingName] = useState(false);
@@ -104,7 +110,34 @@ export default function ProfileScreen() {
     {
       icon: 'download-outline' as const,
       label: 'Export Data',
-      onPress: () => Alert.alert('Coming Soon', 'CSV export will be available in the next update!'),
+      onPress: async () => {
+        try {
+            if (!personalExpenses || personalExpenses.length === 0) {
+                Alert.alert('No Data', 'You have no expenses to export.');
+                return;
+            }
+            
+            let csv = 'Date,Merchant,Category,Amount\n';
+            personalExpenses.forEach((e: any) => {
+                const amount = (e.amount / 100).toFixed(2);
+                const safeMerchant = e.merchant ? String(e.merchant).replace(/"/g, '""') : '';
+                csv += `${e.expense_date},"${safeMerchant}",${e.category},${amount}\n`;
+            });
+            
+            const fileName = `Expensify_Export_${new Date().toISOString().split('T')[0]}.csv`;
+            const fileUri = (FileSystem.documentDirectory ?? '') + fileName;
+            
+            await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: 'utf8' });
+            
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(fileUri, { UTI: 'public.comma-separated-values-text', mimeType: 'text/csv', dialogTitle: 'Export Expenses' });
+            } else {
+                Alert.alert('Error', 'Sharing is not available on your device');
+            }
+        } catch (error: any) {
+            Alert.alert('Export Error', error.message);
+        }
+      },
     },
     {
       icon: 'shield-checkmark-outline' as const,
