@@ -21,11 +21,10 @@ In a world full of basic budgeting apps, Expensify stands out by eliminating the
 
 | Home Dashboard | Add Expense | AI Insights |
 |:-:|:-:|:-:|
-| Spending stats, charts & budget overview | Form with AI category suggestion | Automated daily/weekly/monthly summaries |
-
+| ![Home Dashboard](./screenshots/home.jpg) | ![Add Expense](./screenshots/add.jpg) | ![AI Insights](./screenshots/insights.jpg) |
 | Voice Input | Recurring Expenses | Family Group |
 |:-:|:-:|:-:|
-| Speak an expense to add it instantly | Manage subscriptions & recurring bills | Track spending across family members |
+| ![Voice Input](./screenshots/voice.jpg) | ![Recurring](./screenshots/recurring.jpg) | ![Family Group](./screenshots/family.jpg) |
 
 ---
 
