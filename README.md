@@ -24,7 +24,7 @@ In a world full of basic budgeting apps, Expensify stands out by eliminating the
 | ![Home Dashboard](./screenshots/home.jpg) | ![Add Expense](./screenshots/add.jpg) | ![AI Insights](./screenshots/insights.jpg) |
 | Voice Input | Recurring Expenses | Family Group |
 |:-:|:-:|:-:|
-| ![Voice Input](./screenshots/voice.jpg) | ![Recurring](./screenshots/recurring.jpg) | ![Family Group](./screenshots/family.jpg) |
+| ![Voice Input](./screenshots/voice.jpg) | ![Recurring](./screenshots/recurring.jpg) | ![Family Group](./screenshots/group.jpg) |
 
 ---
 

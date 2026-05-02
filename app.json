@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "expensify",
+    "name": "Expensify",
     "slug": "expensify",
     "scheme": "expensify",
     "version": "1.0.0",
@@ -23,12 +23,17 @@
       ]
     },
     "android": {
+      "package": "com.rxhuljoshi.expensify",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#6C63FF"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -48,11 +53,18 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
           "color": "#6C63FF",
           "sounds": []
         }
-      ]
-    ]
+      ],
+      "expo-web-browser",
+      "expo-asset"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dbfa44d7-75d1-4900-88d2-e6cc285479d6"
+      }
+    }
   }
 }
