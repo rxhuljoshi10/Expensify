@@ -13,6 +13,10 @@ import { useTheme, Theme } from '../../lib/theme';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useFamilyGroup } from '../../hooks/useFamilyGroup';
 
+type ListItem =
+  | { type: 'header'; monthKey: string; label: string; total: number }
+  | { type: 'expense'; data: any };
+
 export default function ExpensesScreen() {
   const theme = useTheme();
   const styles = createStyles(theme);
@@ -66,7 +70,7 @@ export default function ExpensesScreen() {
       
       let matchesTimeline = true;
       if (activeTimelineOption !== 'all') {
-        const expenseDate = new Date(e.expense_date); // Fixed: was e.date previously
+        const expenseDate = new Date(e.expense_date);
         if (activeTimelineOption === 'older') {
           const limitDate = new Date();
           limitDate.setMonth(limitDate.getMonth() - 3);
@@ -79,10 +83,54 @@ export default function ExpensesScreen() {
         }
       }
       
-      const matchesPaymentMode = true; // Active but dummy
-
+      const matchesPaymentMode = true;
       return matchesSearch && matchesCategory && matchesTimeline && matchesPaymentMode;
     }), [expenses, search, activeCategory, activeTimelineOption, activePaymentMode]);
+
+  // Grand total of currently filtered expenses
+  const filteredTotal = useMemo(
+    () => filtered.reduce((sum, e) => sum + e.amount, 0),
+    [filtered]
+  );
+
+  // Build grouped list: insert month header rows before each new month's expenses
+  const groupedList = useMemo((): ListItem[] => {
+    const result: ListItem[] = [];
+    let currentMonthKey = '';
+
+    // Group expenses by month to compute per-month totals first
+    const monthTotals: Record<string, number> = {};
+    filtered.forEach(e => {
+      const d = new Date(e.expense_date);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      monthTotals[key] = (monthTotals[key] ?? 0) + e.amount;
+    });
+
+    filtered.forEach(e => {
+      const d = new Date(e.expense_date);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+
+      if (key !== currentMonthKey) {
+        currentMonthKey = key;
+        result.push({
+          type: 'header',
+          monthKey: key,
+          label,
+          total: monthTotals[key],
+        });
+      }
+      result.push({ type: 'expense', data: e });
+    });
+
+    return result;
+  }, [filtered]);
+
+  // Whether any filter is narrowing the view to a specific month
+  const isMonthFiltered = activeTimelineOption !== 'all';
+  const activeMonthLabel = isMonthFiltered
+    ? timelineOptions.find(o => o.value === activeTimelineOption)?.label
+    : null;
 
   const confirmDelete = (id: string, merchant: string) => {
     Alert.alert('Delete expense', `Remove "${merchant}"?`, [
@@ -96,7 +144,7 @@ export default function ExpensesScreen() {
   return (
     <SafeAreaView style={styles.container}>
 
-      {/* Fixed header — never shrinks regardless of list size */}
+      {/* Fixed header */}
       <View>
         {group && (
           <View style={styles.viewTogglePadding}>
@@ -161,9 +209,23 @@ export default function ExpensesScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Filtered total banner — shown when a specific month (or category) filter is active */}
+        {(isMonthFiltered || activeCategory !== 'All') && filtered.length > 0 && (
+          <View style={styles.totalBanner}>
+            <View>
+              <Text style={styles.totalBannerLabel}>
+                {activeMonthLabel ?? activeCategory}
+                {activeCategory !== 'All' && activeMonthLabel ? ` · ${activeCategory}` : ''}
+              </Text>
+              <Text style={styles.totalBannerSub}>{filtered.length} transactions</Text>
+            </View>
+            <Text style={styles.totalBannerAmount}>₹{Math.round(filteredTotal / 100).toLocaleString('en-IN')}</Text>
+          </View>
+        )}
       </View>
 
-      {/* Scrollable expenses list — takes all remaining space */}
+      {/* Expenses list */}
       {filtered.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.emptyIcon}>💸</Text>
@@ -171,20 +233,34 @@ export default function ExpensesScreen() {
           <Text style={styles.emptySubtext}>Tap + to add your first one</Text>
         </View>
       ) : (
-        <View style={styles.listContainer}>
-          <FlatList
-            data={filtered}
-            keyExtractor={e => e.id}
-            renderItem={({ item }) => (
+        <FlatList
+          data={groupedList}
+          keyExtractor={(item, index) =>
+            item.type === 'header' ? `header-${item.monthKey}` : `expense-${item.data.id}`
+          }
+          contentContainerStyle={{ paddingBottom: 24 }}
+          renderItem={({ item }) => {
+            if (item.type === 'header') {
+              return (
+                <View style={styles.monthHeader}>
+                  <Text style={styles.monthHeaderLabel}>{item.label}</Text>
+                  <Text style={styles.monthHeaderTotal}>
+                    ₹{Math.round(item.total / 100).toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              );
+            }
+            return (
               <ExpenseRow
-                expense={item}
-                onPress={() => router.push(`/edit-expense?id=${item.id}`)}
-                onLongPress={() => confirmDelete(item.id, item.merchant)}
+                expense={item.data}
+                onPress={() => router.push(`/edit-expense?id=${item.data.id}`)}
+                onLongPress={() => confirmDelete(item.data.id, item.data.merchant)}
               />
-            )}
-          />
-        </View>
+            );
+          }}
+        />
       )}
+
       {/* Filter Modal */}
       <Modal visible={showFilterModal} animationType="slide" transparent={true} onRequestClose={() => setShowFilterModal(false)}>
         <TouchableWithoutFeedback onPress={() => setShowFilterModal(false)}>
@@ -305,6 +381,62 @@ function createStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+
+    // Filtered total banner
+    totalBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginHorizontal: 12,
+      marginBottom: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: theme.primary + '15',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.primary + '30',
+    },
+    totalBannerLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.primary,
+    },
+    totalBannerSub: {
+      fontSize: 12,
+      color: theme.textSecondary,
+      marginTop: 2,
+    },
+    totalBannerAmount: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: theme.primary,
+    },
+
+    // Month separator header
+    monthHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginHorizontal: 16,
+      marginTop: 16,
+      marginBottom: 6,
+      paddingBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    monthHeaderLabel: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: theme.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    monthHeaderTotal: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.text,
+    },
+
     modalOverlay: {
       flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end'
     },
