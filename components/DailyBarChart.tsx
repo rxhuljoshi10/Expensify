@@ -7,7 +7,10 @@ import { formatAmount } from '../lib/currency';
 import { getCategoryMeta } from '../constants/categories';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
+    const isFabric = (global as any).nativeFabricUIManager != null;
+    if (!isFabric) {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
 }
 
 function CompactExpenseRow({ expense, theme }: { expense: any; theme: Theme }) {

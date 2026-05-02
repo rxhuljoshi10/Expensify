@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, FlatList,
     StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from './../lib/supabase';
 import { useAuthStore } from './../store/authStore';
 import { useTheme, Theme } from './../lib/theme';
@@ -28,10 +28,20 @@ export default function AIBotScreen() {
     const router = useRouter();
     const theme = useTheme();
     const styles = createStyles(theme);
+    const { initialQuery } = useLocalSearchParams<{ initialQuery?: string }>();
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const listRef = useRef<FlatList>(null);
+    const hasSentInitial = useRef(false);
+
+    // Auto-send the initialQuery when coming from quick actions
+    useEffect(() => {
+        if (initialQuery && !hasSentInitial.current) {
+            hasSentInitial.current = true;
+            sendMessage(initialQuery);
+        }
+    }, [initialQuery]);
 
     const sendMessage = async (text: string) => {
         if (!text.trim() || isLoading) return;

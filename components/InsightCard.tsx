@@ -8,7 +8,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
+    const isFabric = (global as any).nativeFabricUIManager != null;
+    if (!isFabric) {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
 }
 
 import { useInsightStore } from '../store/insightStore';

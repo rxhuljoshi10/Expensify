@@ -22,7 +22,11 @@ export const useInsightStore = create<InsightState>((set) => ({
                 body: { userId }
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Global generation failed:', error);
+                throw error;
+            }
+            console.log('Global generation succeeded:', data);
 
             // Assuming the function returns something like { success: true, processed: 1 }
             // The actual content is in the DB, but we want to simulate real-time reflection.

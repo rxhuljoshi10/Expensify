@@ -38,7 +38,7 @@ serve(async (req) => {
         }
 
         // Fetch users to process
-        let userList = [];
+        let userList: { id: string }[] = [];
         if (userId) {
             userList = [{ id: userId }];
         } else {
@@ -54,9 +54,11 @@ serve(async (req) => {
         }
 
         let processed = 0;
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const sinceStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+        // Fetch last 60 days to have enough data for both current month and previous month
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        const sinceStr = sixtyDaysAgo.toISOString().split('T')[0];
 
         for (const user of userList) {
             try {
@@ -65,7 +67,8 @@ serve(async (req) => {
                     .from('expenses')
                     .select('amount, category, merchant, expense_date')
                     .eq('user_id', user.id)
-                    .gte('expense_date', sinceStr);
+                    .gte('expense_date', sinceStr)
+                    .order('expense_date', { ascending: false });
 
                 if (expError) {
                     console.error(`Error fetching expenses for ${user.id}:`, expError);
@@ -73,16 +76,55 @@ serve(async (req) => {
                 }
 
                 const expenseList = expenses || [];
-                console.log(`Found ${expenseList.length} expenses for coaching.`);
+                console.log(`Found ${expenseList.length} total expenses.`);
 
-                const totalPaise = expenseList.reduce((s, e) => s + e.amount, 0);
-                const catTotals: Record<string, number> = {};
-                expenseList.forEach(e => {
-                    catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
+                // --- Split expenses by current month vs previous period ---
+                const now = new Date();
+                const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                const currentMonthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+                const currentMonthExpenses = expenseList.filter((e: any) => e.expense_date >= currentMonthStart);
+                const prevMonthExpenses = expenseList.filter((e: any) => e.expense_date < currentMonthStart);
+
+                const totalCurrentMonth = currentMonthExpenses.reduce((s: number, e: any) => s + e.amount, 0);
+                const totalPrevPeriod = prevMonthExpenses.reduce((s: number, e: any) => s + e.amount, 0);
+
+                const catCurrentMonth: Record<string, number> = {};
+                currentMonthExpenses.forEach((e: any) => {
+                    catCurrentMonth[e.category] = (catCurrentMonth[e.category] ?? 0) + e.amount;
                 });
 
-                const context = `User: ${user.id}\nTransactions: ${expenseList.length}\nTotal: ₹${Math.round(totalPaise / 100)}\nProfile: ${Object.entries(catTotals).map(([k,v]) => `${k}: ₹${Math.round(v/100)}`).join(', ')}`;
+                const catPrevPeriod: Record<string, number> = {};
+                prevMonthExpenses.forEach((e: any) => {
+                    catPrevPeriod[e.category] = (catPrevPeriod[e.category] ?? 0) + e.amount;
+                });
 
+                // --- Build structured context for the AI ---
+                const todayStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                const currentCatStr = Object.entries(catCurrentMonth).length > 0
+                    ? Object.entries(catCurrentMonth).map(([k, v]) => `${k}: ₹${Math.round(v / 100)}`).join(', ')
+                    : 'No transactions yet this month';
+                const prevCatStr = Object.entries(catPrevPeriod).length > 0
+                    ? Object.entries(catPrevPeriod).map(([k, v]) => `${k}: ₹${Math.round(v / 100)}`).join(', ')
+                    : 'No transactions in this period';
+
+                const context = [
+                    `TODAY: ${todayStr}`,
+                    ``,
+                    `=== ${currentMonthName} (Current Month So Far) ===`,
+                    `Transactions: ${currentMonthExpenses.length}`,
+                    `Total Spent: ₹${Math.round(totalCurrentMonth / 100)}`,
+                    `By Category: ${currentCatStr}`,
+                    ``,
+                    `=== Previous Period (Before This Month) ===`,
+                    `Transactions: ${prevMonthExpenses.length}`,
+                    `Total Spent: ₹${Math.round(totalPrevPeriod / 100)}`,
+                    `By Category: ${prevCatStr}`,
+                ].join('\n');
+
+                console.log("Context being sent to AI:\n", context);
+
+                // --- Call AI ---
                 console.log("Calling Gemini API...");
                 const aiResponse = await fetch(
                     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`,
@@ -90,27 +132,39 @@ serve(async (req) => {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            contents: [{ parts: [{ text: `You are a Smart Financial Coach. Return a JSON briefing.
+                            contents: [{ parts: [{ text: `You are a Smart Financial Coach for an Indian expense tracking app. Return ONLY valid JSON.
 {
-  "briefing": "Conversational summary.",
-  "vital_signs": { "status": "on_track"|"warning", "burn_rate": "low"|"high", "top_leak": "category" },
-  "anomaly": "Insight or null",
-  "tip": "Action tip."
+  "briefing": "Conversational 2-3 sentence summary of the user's financial situation.",
+  "vital_signs": { "status": "on_track" or "warning", "burn_rate": "low" or "high", "top_leak": "top spending category name or null" },
+  "anomaly": "One interesting pattern or observation, or null if nothing notable.",
+  "tip": "One specific, actionable money-saving tip."
 }
 
-CRITICAL INSTRUCTION: Ensure the briefing and tips are highly varied and different on every request. Keep it conversational.
-Current Date: ${new Date().toLocaleDateString()}
+CRITICAL RULES — follow these strictly:
+- Use ONLY the data provided. Do NOT invent transactions or amounts.
+- If "Current Month Transactions" is 0, say the month has just started with no spending yet. Do NOT claim any spending happened.
+- Base your "top_leak" on current month data ONLY. If current month has no data, set it to null.
+- Always reference the correct month name as given in the data.
+- Use ₹ (Indian Rupee) for all amounts.
+- Keep the briefing friendly, concise, and encouraging.
 
-DATA:
+FINANCIAL DATA:
 ${context}` }] }],
-                            generationConfig: { responseMimeType: "application/json", temperature: 1.0 }
+                            generationConfig: { responseMimeType: "application/json", temperature: 0.7 }
                         }),
                     },
                 );
 
                 const aiData = await aiResponse.json();
+                console.log("Gemini HTTP status:", aiResponse.status);
+                console.log("Gemini full response:", JSON.stringify(aiData));
+
                 if (!aiData.candidates?.[0]) {
-                    console.error("AI returned no candidates:", JSON.stringify(aiData));
+                    console.error("AI returned no candidates. Full response:", JSON.stringify(aiData));
+                    // Check for quota/auth errors specifically
+                    if (aiData.error) {
+                        console.error("Gemini API error code:", aiData.error.code, "message:", aiData.error.message);
+                    }
                     continue;
                 }
                 
