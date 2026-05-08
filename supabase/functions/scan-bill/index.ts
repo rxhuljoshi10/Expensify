@@ -73,7 +73,7 @@ Return EXACTLY this JSON shape:
 Rules:
 - "total" must be a number (not a string). Use the grand total / final payable amount.
 - "date" must be YYYY-MM-DD format or null if not found.
-- "items" should be a list of ALL product/item names found on the receipt.
+- "items" should be a list of ALL product/item names found on the receipt along with their price/amount in the format "item:amount" (e.g., "water:20", "egg:40").
 - "confidence" is your confidence in the extraction: high if all fields found clearly, low if OCR was unclear.`,
           }],
         }],

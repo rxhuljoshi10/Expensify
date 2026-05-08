@@ -93,8 +93,7 @@ export const pickAndScanBill = async (): Promise<{
     const pickerOptions: ImagePicker.ImagePickerOptions = {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,    // start with full quality — we compress below
-      allowsEditing: true,
-      aspect: [3, 4],  // portrait crop — most receipts are tall
+      allowsEditing: true, // Re-enabled to allow cropping useless background, but without a fixed aspect ratio
     };
 
     const result = choice === 'camera' 

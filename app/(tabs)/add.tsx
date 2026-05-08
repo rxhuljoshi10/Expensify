@@ -185,7 +185,7 @@ export default function AddExpenseScreen() {
 
         // If items were found, put them in the description
         if (result.items?.length > 0) {
-            setDescription(result.items.join(', '));
+            setDescription(`(${result.items.join(', ')})`);
         }
     };
 
