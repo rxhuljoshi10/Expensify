@@ -3,7 +3,6 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { Link } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 
 import { useTheme, Theme } from '../../lib/theme';
@@ -39,7 +38,14 @@ export default function LoginScreen() {
   const onGoogleSignInPress = async () => {
     setLoading(true);
     try {
-      const redirectUrl = makeRedirectUri();
+      // In Expo Go, this generates `exp://<ip>:8081/--/auth/callback`
+      // In a standalone app, this generates `expensify://auth/callback`
+      const redirectUrl = makeRedirectUri({
+        scheme: 'expensify',
+        path: 'auth/callback',
+      });
+      console.log('Redirect URL:', redirectUrl);
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -52,18 +58,25 @@ export default function LoginScreen() {
       if (!data?.url) throw new Error('No OAuth URL returned');
 
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-      if (result.type === 'success' && result.url) {
+      console.log('Browser result type:', result.type);
 
-        const urlParams = new URLSearchParams(result.url.split('#')[1] || result.url.split('?')[1]);
+      if (result.type === 'success' && result.url) {
+        // Try fragment first (#access_token=...), then query string
+        const fragment = result.url.split('#')[1] ?? '';
+        const query = result.url.split('?')[1] ?? '';
+        const urlParams = new URLSearchParams(fragment || query);
         const access_token = urlParams.get('access_token');
         const refresh_token = urlParams.get('refresh_token');
 
         if (access_token && refresh_token) {
-          await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
+          await supabase.auth.setSession({ access_token, refresh_token });
+        } else {
+          // PKCE flow: let Supabase handle the code exchange via the URL
+          await supabase.auth.exchangeCodeForSession(result.url);
         }
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
+        // User closed the browser manually — not an error
+        console.log('OAuth cancelled by user');
       }
     } catch (e: any) {
       Alert.alert('OAuth Error', e.message);
