@@ -62,6 +62,7 @@ export default function VoiceScreen() {
                             category: exp.category as any,
                             expense_date: today,
                             description: '',
+                            source: 'voice',
                         })
                     )
                 );

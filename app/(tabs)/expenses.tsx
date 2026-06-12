@@ -6,8 +6,9 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useExpenses, useGroupExpenses, useDeleteExpense } from '../../hooks/useExpenses';
 import ExpenseRow from '../../components/ExpenseRow';
+import ExpenseDetailSheet from '../../components/ExpenseDetailSheet';
 import { CATEGORIES } from '../../constants/categories';
-import { Category } from '../../types/expense';
+import { Category, Expense } from '../../types/expense';
 import ExpenseListSkeleton from '../../components/ExpenseListSkeleton';
 import { useTheme, Theme } from '../../lib/theme';
 import { useDashboardStore } from '../../store/dashboardStore';
@@ -33,6 +34,7 @@ export default function ExpensesScreen() {
 
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<Category | 'All'>('All');
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
 
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [expandedFilter, setExpandedFilter] = useState<'Timeline' | 'PaymentMode' | null>(null);
@@ -253,13 +255,21 @@ export default function ExpensesScreen() {
             return (
               <ExpenseRow
                 expense={item.data}
-                onPress={() => router.push(`/edit-expense?id=${item.data.id}`)}
+                onPress={() => setSelectedExpense(item.data)}
                 onLongPress={() => confirmDelete(item.data.id, item.data.merchant)}
               />
             );
           }}
         />
       )}
+
+      {/* Expense Detail Sheet */}
+      <ExpenseDetailSheet
+        expense={selectedExpense}
+        onClose={() => setSelectedExpense(null)}
+        onEdit={(id) => { setSelectedExpense(null); router.push(`/edit-expense?id=${id}`); }}
+        onDelete={(id, merchant) => confirmDelete(id, merchant)}
+      />
 
       {/* Filter Modal */}
       <Modal visible={showFilterModal} animationType="slide" transparent={true} onRequestClose={() => setShowFilterModal(false)}>

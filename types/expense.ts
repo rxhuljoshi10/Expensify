@@ -4,6 +4,12 @@ export type Category =
     | 'Entertainment' | 'Home' | 'Education' | 'Bills'
     | 'Personal' | 'Travel' | 'Fitness' | 'Other';
 
+export interface ExpenseItem {
+    name: string;
+    amount: number;    // unit price in rupees (raw from receipt, NOT paise)
+    quantity?: number;
+}
+
 export interface Expense {
     id: string;
     user_id: string;
@@ -15,6 +21,7 @@ export interface Expense {
     created_at: string;
     source?: string;
     attachment_url?: string | null; // path in Supabase Storage (receipt photo)
+    items?: ExpenseItem[] | null;   // structured line items from scanned receipt
 }
 
 export interface CreateExpenseInput {
@@ -24,6 +31,8 @@ export interface CreateExpenseInput {
     description?: string;
     expense_date: string;
     attachment_url?: string | null;
+    items?: ExpenseItem[] | null;
+    source?: string;
 }
 
 // Add to types/expense.ts

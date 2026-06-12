@@ -11,7 +11,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useExpenses, useUpdateExpense, useDeleteExpense } from '../hooks/useExpenses';
 import CategoryPicker from '../components/CategoryPicker';
 import { rupeesToPaise } from '../lib/currency';
-import { Category } from '../types/expense';
+import { Category, ExpenseItem } from '../types/expense';
 import { useTheme, Theme } from '../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -54,6 +54,9 @@ export default function EditExpenseScreen() {
     const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
     const [showImageViewer, setShowImageViewer] = useState(false);
 
+    // ── Items state ──────────────────────────────────────────────────────
+    const [editItems, setEditItems] = useState<ExpenseItem[]>([]);
+
     useEffect(() => {
         if (expense) {
             setAmount(String(expense.amount / 100));
@@ -67,6 +70,7 @@ export default function EditExpenseScreen() {
             if (path) {
                 getReceiptSignedUrl(path).then(url => setSignedUrl(url));
             }
+            setEditItems((expense.items ?? []) as ExpenseItem[]);
         }
     }, [expense]);
 
@@ -105,6 +109,7 @@ export default function EditExpenseScreen() {
                 merchant: merchant.trim(),
                 description: description.trim(),
                 expense_date: getLocalISODate(date),
+                items: editItems.length > 0 ? editItems : null,
                 // undefined → don't touch, null → clear, string → new path
                 ...(storagePath !== undefined ? { attachment_url: storagePath } : {}),
             }, {
@@ -171,6 +176,86 @@ export default function EditExpenseScreen() {
 
                 <Text style={styles.label}>Note (optional)</Text>
                 <TextInput style={styles.input} value={description} onChangeText={setDescription} placeholder="Any extra detail..." placeholderTextColor={theme.textSecondary} />
+
+                {/* ── Bill Items Editor ── */}
+                <View style={styles.itemsSection}>
+                    <View style={styles.itemsSectionHeader}>
+                        <Ionicons name="receipt-outline" size={16} color={theme.primary} />
+                        <Text style={styles.itemsSectionTitle}>
+                            Bill Items {editItems.length > 0 ? `(${editItems.length})` : ''}
+                        </Text>
+                        {editItems.length > 0 && (
+                            <TouchableOpacity onPress={() => setEditItems([])} style={{ marginLeft: 'auto' }}>
+                                <Text style={{ fontSize: 12, color: theme.danger }}>Clear all</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {editItems.length > 0 && (
+                        <>
+                            <View style={styles.itemRowHeader}>
+                                <Text style={[styles.itemColLabel, { flex: 2.5 }]}>ITEM</Text>
+                                <Text style={[styles.itemColLabel, { flex: 0.6, textAlign: 'center' }]}>QTY</Text>
+                                <Text style={[styles.itemColLabel, { flex: 1, textAlign: 'right' }]}>₹ PRICE</Text>
+                                <View style={{ width: 28 }} />
+                            </View>
+                            {editItems.map((item, idx) => (
+                                <View key={idx} style={styles.itemEditorRow}>
+                                    <TextInput
+                                        style={[styles.itemInput, { flex: 2.5 }]}
+                                        value={item.name}
+                                        onChangeText={text => {
+                                            const next = [...editItems];
+                                            next[idx] = { ...next[idx], name: text };
+                                            setEditItems(next);
+                                        }}
+                                        placeholder="Name"
+                                        placeholderTextColor={theme.textSecondary}
+                                    />
+                                    <TextInput
+                                        style={[styles.itemInput, { flex: 0.6, textAlign: 'center' }]}
+                                        value={item.quantity != null ? String(item.quantity) : ''}
+                                        onChangeText={text => {
+                                            const next = [...editItems];
+                                            const qty = parseInt(text);
+                                            next[idx] = { ...next[idx], quantity: isNaN(qty) ? undefined : qty };
+                                            setEditItems(next);
+                                        }}
+                                        placeholder="1"
+                                        placeholderTextColor={theme.textSecondary}
+                                        keyboardType="numeric"
+                                    />
+                                    <TextInput
+                                        style={[styles.itemInput, { flex: 1, textAlign: 'right' }]}
+                                        value={String(item.amount)}
+                                        onChangeText={text => {
+                                            const next = [...editItems];
+                                            const amt = parseFloat(text);
+                                            next[idx] = { ...next[idx], amount: isNaN(amt) ? 0 : amt };
+                                            setEditItems(next);
+                                        }}
+                                        keyboardType="decimal-pad"
+                                        placeholderTextColor={theme.textSecondary}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setEditItems(prev => prev.filter((_, i) => i !== idx))}
+                                        style={styles.itemDeleteBtn}
+                                    >
+                                        <Ionicons name="close-circle" size={18} color={theme.danger} />
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
+                        </>
+                    )}
+
+                    <TouchableOpacity
+                        style={styles.addItemBtn}
+                        onPress={() => setEditItems(prev => [...prev, { name: '', amount: 0 }])}
+                    >
+                        <Ionicons name="add-circle-outline" size={16} color={theme.primary} />
+                        <Text style={styles.addItemBtnText}>Add item</Text>
+                    </TouchableOpacity>
+                </View>
 
                 {/* ── Receipt Attachment ── */}
                 <Text style={styles.label}>Receipt / Attachment (optional)</Text>
@@ -261,6 +346,35 @@ function createStyles(theme: Theme) {
         saveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
         deleteButton: { borderWidth: 1, borderColor: '#ff4444', borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 12, marginBottom: 48 },
         deleteButtonText: { color: '#ff4444', fontSize: 17, fontWeight: '500' },
+
+        // Bill Items editor
+        itemsSection: {
+            marginTop: 16,
+            borderWidth: 1, borderColor: theme.primary + '44',
+            borderRadius: 14, padding: 14,
+            backgroundColor: theme.primary + '06',
+        },
+        itemsSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
+        itemsSectionTitle: { fontSize: 14, fontWeight: '700', color: theme.primary },
+        itemRowHeader: {
+            flexDirection: 'row', alignItems: 'center',
+            paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: theme.border, marginBottom: 4,
+        },
+        itemColLabel: {
+            fontSize: 10, fontWeight: '800', color: theme.textSecondary,
+            letterSpacing: 0.5, textTransform: 'uppercase',
+        },
+        itemEditorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+        itemInput: {
+            borderWidth: 1, borderColor: theme.border, borderRadius: 8,
+            padding: 8, fontSize: 13, color: theme.text, backgroundColor: theme.inputBg,
+        },
+        itemDeleteBtn: { width: 28, alignItems: 'center' },
+        addItemBtn: {
+            flexDirection: 'row', alignItems: 'center', gap: 6,
+            marginTop: 12, paddingVertical: 8, alignSelf: 'flex-start',
+        },
+        addItemBtnText: { fontSize: 13, color: theme.primary, fontWeight: '600' },
 
         // Attachment
         attachmentButton: {

@@ -39,7 +39,7 @@ export const useAddExpense = () => {
         mutationFn: async (input: CreateExpenseInput) => {
             const { data, error } = await supabase
                 .from('expenses')
-                .insert({ ...input, user_id: user!.id, source: 'manual' })
+                .insert({ source: 'manual', ...input, user_id: user!.id })
                 .select()
                 .single();
             if (error) throw error;

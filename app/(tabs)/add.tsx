@@ -10,7 +10,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAddExpense } from '../../hooks/useExpenses';
 import CategoryPicker from '../../components/CategoryPicker';
 import { rupeesToPaise } from '../../lib/currency';
-import { Category } from '../../types/expense';
+import { Category, ExpenseItem } from '../../types/expense';
 import { useTheme, Theme } from '../../lib/theme';
 import { categorizeExpense, parseVoiceExpense, pickAndScanBill } from '../../lib/ai';
 import { getLocalISODate } from '../../lib/date';
@@ -38,13 +38,15 @@ export default function AddExpenseScreen() {
     const [isCategorizing, setIsCategorizing] = useState(false);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const [isScanning, setIsScanning] = useState(false);
+    const [source, setSource] = useState<string>('manual');
 
     // ── Receipt attachment state ─────────────────────────────────────────────
-    // attachmentUri: local file URI for preview thumbnail (not persisted)
-    // attachmentBase64: base64 payload to upload when saving
     const [attachmentUri, setAttachmentUri] = useState<string | null>(null);
     const [attachmentBase64, setAttachmentBase64] = useState<string | null>(null);
     const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+
+    // ── Scanned items state ───────────────────────────────────────────────────
+    const [scannedItems, setScannedItems] = useState<ExpenseItem[]>([]);
 
     // ── Voice modal ──────────────────────────────────────────────────────────
     const [showVoice, setShowVoice] = useState(false);
@@ -87,6 +89,7 @@ export default function AddExpenseScreen() {
                 setAmount(String(exp.amount));
                 setMerchant(exp.merchant);
                 setCategory(exp.category as Category);
+                setSource('voice');
                 toast.success('Form filled from voice 🎙️');
                 resetVoice();
                 setShowVoice(false);
@@ -113,6 +116,7 @@ export default function AddExpenseScreen() {
                         category: exp.category as any,
                         expense_date: today,
                         description: '',
+                        source: 'voice',
                     })
                 )
             );
@@ -154,6 +158,8 @@ export default function AddExpenseScreen() {
                 description: description.trim(),
                 expense_date: getLocalISODate(date),
                 attachment_url: storagePath ?? undefined,
+                items: scannedItems.length > 0 ? scannedItems : undefined,
+                source,
             }, {
                 onSuccess: () => {
                     toast.success('Expense added');
@@ -165,6 +171,8 @@ export default function AddExpenseScreen() {
                     setErrors({});
                     setAttachmentUri(null);
                     setAttachmentBase64(null);
+                    setScannedItems([]);
+                    setSource('manual');
                     router.back();
                 },
                 onError: (e) => { toast.error(e.message); },
@@ -198,6 +206,8 @@ export default function AddExpenseScreen() {
             return;
         }
 
+        setSource('scan');
+
         if (result.confidence === 'low') {
             toast.info('Receipt unclear — please check and correct the details');
         } else if (result.confidence === 'medium') {
@@ -215,9 +225,9 @@ export default function AddExpenseScreen() {
             if (!isNaN(parsed.getTime())) setDate(parsed);
         }
 
-        // If items were found, put them in the description
+        // If items were found, store as structured items (NOT in description)
         if (result.items?.length > 0) {
-            setDescription(`(${result.items.join(', ')})`);
+            setScannedItems(result.items);
         }
 
         // Auto-attach the scanned bill image
@@ -342,6 +352,83 @@ export default function AddExpenseScreen() {
                     value={description}
                     onChangeText={setDescription}
                 />
+
+                {/* ── Scanned Bill Items Editor ── */}
+                {scannedItems.length > 0 && (
+                    <View style={styles.itemsSection}>
+                        <View style={styles.itemsSectionHeader}>
+                            <Ionicons name="receipt-outline" size={16} color={theme.primary} />
+                            <Text style={styles.itemsSectionTitle}>Bill Items ({scannedItems.length})</Text>
+                            <TouchableOpacity onPress={() => setScannedItems([])} style={{ marginLeft: 'auto' }}>
+                                <Text style={{ fontSize: 12, color: theme.danger }}>Clear all</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Column headers */}
+                        <View style={styles.itemRowHeader}>
+                            <Text style={[styles.itemColLabel, { flex: 2.5 }]}>ITEM</Text>
+                            <Text style={[styles.itemColLabel, { flex: 0.6, textAlign: 'center' }]}>QTY</Text>
+                            <Text style={[styles.itemColLabel, { flex: 1, textAlign: 'right' }]}>₹ PRICE</Text>
+                            <View style={{ width: 28 }} />
+                        </View>
+
+                        {scannedItems.map((item, idx) => (
+                            <View key={idx} style={styles.itemEditorRow}>
+                                <TextInput
+                                    style={[styles.itemInput, { flex: 2.5 }]}
+                                    value={item.name}
+                                    onChangeText={text => {
+                                        const next = [...scannedItems];
+                                        next[idx] = { ...next[idx], name: text };
+                                        setScannedItems(next);
+                                    }}
+                                    placeholder="Name"
+                                    placeholderTextColor={theme.textSecondary}
+                                />
+                                <TextInput
+                                    style={[styles.itemInput, { flex: 0.6, textAlign: 'center' }]}
+                                    value={item.quantity != null ? String(item.quantity) : ''}
+                                    onChangeText={text => {
+                                        const next = [...scannedItems];
+                                        const qty = parseInt(text);
+                                        next[idx] = { ...next[idx], quantity: isNaN(qty) ? undefined : qty };
+                                        setScannedItems(next);
+                                    }}
+                                    placeholder="1"
+                                    placeholderTextColor={theme.textSecondary}
+                                    keyboardType="numeric"
+                                />
+                                <TextInput
+                                    style={[styles.itemInput, { flex: 1, textAlign: 'right' }]}
+                                    value={String(item.amount)}
+                                    onChangeText={text => {
+                                        const next = [...scannedItems];
+                                        const amt = parseFloat(text);
+                                        next[idx] = { ...next[idx], amount: isNaN(amt) ? 0 : amt };
+                                        setScannedItems(next);
+                                    }}
+                                    keyboardType="decimal-pad"
+                                    placeholderTextColor={theme.textSecondary}
+                                />
+                                <TouchableOpacity
+                                    onPress={() => setScannedItems(prev => prev.filter((_, i) => i !== idx))}
+                                    style={styles.itemDeleteBtn}
+                                >
+                                    <Ionicons name="close-circle" size={18} color={theme.danger} />
+                                </TouchableOpacity>
+                            </View>
+                        ))}
+
+                        {/* Add item button */}
+                        <TouchableOpacity
+                            style={styles.addItemBtn}
+                            onPress={() => setScannedItems(prev => [...prev, { name: '', amount: 0 }])}
+                        >
+                            <Ionicons name="add-circle-outline" size={16} color={theme.primary} />
+                            <Text style={styles.addItemBtnText}>Add item</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* ── Receipt Attachment ── */}
                 <Text style={styles.label}>Receipt / Attachment (optional)</Text>
@@ -511,6 +598,43 @@ function createStyles(theme: Theme) {
         saveButtonDisabled: { opacity: 0.6 },
         saveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
         errorText: { fontSize: 12, color: '#ff4444', marginTop: 4, marginBottom: 4 },
+
+        // Bill Items editor
+        itemsSection: {
+            marginTop: 16,
+            borderWidth: 1, borderColor: theme.primary + '44',
+            borderRadius: 14, padding: 14,
+            backgroundColor: theme.primary + '06',
+        },
+        itemsSectionHeader: {
+            flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12,
+        },
+        itemsSectionTitle: { fontSize: 14, fontWeight: '700', color: theme.primary },
+        itemRowHeader: {
+            flexDirection: 'row', alignItems: 'center',
+            paddingBottom: 6,
+            borderBottomWidth: 1, borderBottomColor: theme.border,
+            marginBottom: 4,
+        },
+        itemColLabel: {
+            fontSize: 10, fontWeight: '800', color: theme.textSecondary,
+            letterSpacing: 0.5, textTransform: 'uppercase',
+        },
+        itemEditorRow: {
+            flexDirection: 'row', alignItems: 'center',
+            gap: 6, marginTop: 8,
+        },
+        itemInput: {
+            borderWidth: 1, borderColor: theme.border, borderRadius: 8,
+            padding: 8, fontSize: 13, color: theme.text, backgroundColor: theme.inputBg,
+        },
+        itemDeleteBtn: { width: 28, alignItems: 'center' },
+        addItemBtn: {
+            flexDirection: 'row', alignItems: 'center', gap: 6,
+            marginTop: 12, paddingVertical: 8,
+            alignSelf: 'flex-start',
+        },
+        addItemBtnText: { fontSize: 13, color: theme.primary, fontWeight: '600' },
 
         // Attachment
         attachmentButton: {

@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Alert } from 'react-native';
+import { ExpenseItem } from '../types/expense';
 
 export const parseVoiceExpense = async (audioUri: string): Promise<{
   transcript: string;
@@ -69,7 +70,7 @@ export const pickAndScanBill = async (): Promise<{
   total: number | null;
   date: string | null;
   category: string;
-  items: string[];
+  items: ExpenseItem[];
   confidence: 'high' | 'medium' | 'low';
   ocrText: string;
   imageUri: string;   // local URI of the compressed image for preview
