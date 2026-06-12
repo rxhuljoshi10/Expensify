@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    ScrollView, KeyboardAvoidingView, Platform, Modal, Animated,
+    ScrollView, KeyboardAvoidingView, Platform, Modal, Animated, Image, ActivityIndicator,
 } from 'react-native';
 import { toast } from '../../lib/toast';
 import { useRouter } from 'expo-router';
@@ -16,12 +16,17 @@ import { categorizeExpense, parseVoiceExpense, pickAndScanBill } from '../../lib
 import { getLocalISODate } from '../../lib/date';
 import { Ionicons } from '@expo/vector-icons';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { uploadReceiptAttachment } from '../../lib/storage';
+import { useAuthStore } from '../../store/authStore';
 
 export default function AddExpenseScreen() {
     const theme = useTheme();
     const styles = createStyles(theme);
     const router = useRouter();
     const { mutate: addExpense, isPending } = useAddExpense();
+    const { user } = useAuthStore();
 
     const [amount, setAmount] = useState('');
     const [merchant, setMerchant] = useState('');
@@ -33,6 +38,13 @@ export default function AddExpenseScreen() {
     const [isCategorizing, setIsCategorizing] = useState(false);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const [isScanning, setIsScanning] = useState(false);
+
+    // ── Receipt attachment state ─────────────────────────────────────────────
+    // attachmentUri: local file URI for preview thumbnail (not persisted)
+    // attachmentBase64: base64 payload to upload when saving
+    const [attachmentUri, setAttachmentUri] = useState<string | null>(null);
+    const [attachmentBase64, setAttachmentBase64] = useState<string | null>(null);
+    const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
     // ── Voice modal ──────────────────────────────────────────────────────────
     const [showVoice, setShowVoice] = useState(false);
@@ -133,25 +145,45 @@ export default function AddExpenseScreen() {
     const handleSave = () => {
         if (!validate()) return;
         const parsed = parseFloat(amount);
-        addExpense({
-            amount: rupeesToPaise(parsed),
-            category,
-            merchant: merchant.trim(),
-            description: description.trim(),
-            expense_date: getLocalISODate(date),
-        }, {
-            onSuccess: () => {
-                toast.success('Expense added');
-                setAmount('');
-                setMerchant('');
-                setDescription('');
-                setCategory('Food');
-                setDate(new Date());
-                setErrors({});
-                router.back();
-            },
-            onError: (e) => { toast.error(e.message); },
-        });
+
+        const doSave = async (storagePath: string | null) => {
+            addExpense({
+                amount: rupeesToPaise(parsed),
+                category,
+                merchant: merchant.trim(),
+                description: description.trim(),
+                expense_date: getLocalISODate(date),
+                attachment_url: storagePath ?? undefined,
+            }, {
+                onSuccess: () => {
+                    toast.success('Expense added');
+                    setAmount('');
+                    setMerchant('');
+                    setDescription('');
+                    setCategory('Food');
+                    setDate(new Date());
+                    setErrors({});
+                    setAttachmentUri(null);
+                    setAttachmentBase64(null);
+                    router.back();
+                },
+                onError: (e) => { toast.error(e.message); },
+            });
+        };
+
+        // If there is an attachment, upload it first then save
+        if (attachmentBase64 && user) {
+            setIsUploadingAttachment(true);
+            uploadReceiptAttachment(user.id, attachmentBase64)
+                .then(path => doSave(path))
+                .catch(e => {
+                    toast.error('Failed to upload receipt — saving without it');
+                    doSave(null);
+                })
+                .finally(() => setIsUploadingAttachment(false));
+        } else {
+            doSave(null);
+        }
     };
 
     // app/(tabs)/add.tsx — update handleScanBill
@@ -187,6 +219,29 @@ export default function AddExpenseScreen() {
         if (result.items?.length > 0) {
             setDescription(`(${result.items.join(', ')})`);
         }
+
+        // Auto-attach the scanned bill image
+        setAttachmentUri(result.imageUri);
+        setAttachmentBase64(result.base64);
+    };
+
+    // Manually pick a photo from camera/gallery to attach
+    const handlePickAttachment = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 1,
+        });
+        if (result.canceled) return;
+
+        const compressed = await ImageManipulator.manipulateAsync(
+            result.assets[0].uri,
+            [{ resize: { width: 1200 } }],
+            { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        );
+
+        if (!compressed.base64) return;
+        setAttachmentUri(compressed.uri);
+        setAttachmentBase64(compressed.base64);
     };
 
     useEffect(() => {
@@ -288,8 +343,34 @@ export default function AddExpenseScreen() {
                     onChangeText={setDescription}
                 />
 
-                <TouchableOpacity style={[styles.saveButton, isPending && styles.saveButtonDisabled]} onPress={handleSave} disabled={isPending}>
-                    <Text style={styles.saveButtonText}>{isPending ? 'Saving...' : 'Save Expense'}</Text>
+                {/* ── Receipt Attachment ── */}
+                <Text style={styles.label}>Receipt / Attachment (optional)</Text>
+                {attachmentUri ? (
+                    <View style={styles.attachmentPreview}>
+                        <Image source={{ uri: attachmentUri }} style={styles.attachmentThumb} resizeMode="cover" />
+                        <View style={styles.attachmentInfo}>
+                            <Text style={styles.attachmentLabel}>Receipt attached</Text>
+                            <TouchableOpacity onPress={() => { setAttachmentUri(null); setAttachmentBase64(null); }}>
+                                <Text style={styles.attachmentRemove}>Remove</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                ) : (
+                    <TouchableOpacity style={styles.attachmentButton} onPress={handlePickAttachment} activeOpacity={0.7}>
+                        <Ionicons name="attach" size={20} color={theme.primary} />
+                        <Text style={styles.attachmentButtonText}>Attach a photo or receipt</Text>
+                    </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                    style={[styles.saveButton, (isPending || isUploadingAttachment) && styles.saveButtonDisabled]}
+                    onPress={handleSave}
+                    disabled={isPending || isUploadingAttachment}
+                >
+                    {isUploadingAttachment
+                        ? <ActivityIndicator color="#fff" />
+                        : <Text style={styles.saveButtonText}>{isPending ? 'Saving...' : 'Save Expense'}</Text>
+                    }
                 </TouchableOpacity>
             </ScrollView>
 
@@ -430,6 +511,23 @@ function createStyles(theme: Theme) {
         saveButtonDisabled: { opacity: 0.6 },
         saveButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
         errorText: { fontSize: 12, color: '#ff4444', marginTop: 4, marginBottom: 4 },
+
+        // Attachment
+        attachmentButton: {
+            flexDirection: 'row', alignItems: 'center', gap: 10,
+            borderWidth: 1, borderColor: theme.primary + '55', borderStyle: 'dashed',
+            borderRadius: 12, padding: 14, backgroundColor: theme.primary + '08',
+        },
+        attachmentButtonText: { fontSize: 15, color: theme.primary, fontWeight: '500' },
+        attachmentPreview: {
+            flexDirection: 'row', alignItems: 'center', gap: 12,
+            borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 10,
+            backgroundColor: theme.inputBg,
+        },
+        attachmentThumb: { width: 60, height: 60, borderRadius: 8 },
+        attachmentInfo: { flex: 1 },
+        attachmentLabel: { fontSize: 14, fontWeight: '600', color: theme.text },
+        attachmentRemove: { fontSize: 13, color: theme.danger, marginTop: 4 },
 
         // Voice modal
         modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000077' },

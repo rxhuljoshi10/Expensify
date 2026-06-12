@@ -72,6 +72,8 @@ export const pickAndScanBill = async (): Promise<{
   items: string[];
   confidence: 'high' | 'medium' | 'low';
   ocrText: string;
+  imageUri: string;   // local URI of the compressed image for preview
+  base64: string;    // base64 for uploading to Supabase Storage
 } | null> => {
   try {
     // Ask user: camera or gallery
@@ -141,7 +143,11 @@ export const pickAndScanBill = async (): Promise<{
 
     if (data.error) throw new Error(data.error);
 
-    return data;
+    return {
+      ...data,
+      imageUri: compressed.uri,
+      base64: compressed.base64,
+    };
 
   } catch (e: any) {
     console.error('[pickAndScanBill] Caught error:', e.message ?? e);

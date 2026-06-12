@@ -14,6 +14,7 @@ export interface Expense {
     expense_date: string;  // 'YYYY-MM-DD'
     created_at: string;
     source?: string;
+    attachment_url?: string | null; // path in Supabase Storage (receipt photo)
 }
 
 export interface CreateExpenseInput {
@@ -22,6 +23,7 @@ export interface CreateExpenseInput {
     merchant: string;
     description?: string;
     expense_date: string;
+    attachment_url?: string | null;
 }
 
 // Add to types/expense.ts
