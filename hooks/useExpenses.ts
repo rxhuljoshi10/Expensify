@@ -159,12 +159,12 @@ export const useGroupExpenses = () => {
 
         if (isSelf) {
             // Guarantee perfect sync: if the expense belongs to the local user, use their exact live auth metadata.
-            mName = user?.user_metadata?.full_name;
+            mName = user?.user_metadata?.full_name ?? '';
         }
 
         if (!mName) {
             const member = group.members?.find(m => m.user_id === e.user_id);
-            mName = member?.name;
+            mName = member?.name ?? '';
             
             if (!mName || mName.trim() === '') {
                 if (member?.email) {

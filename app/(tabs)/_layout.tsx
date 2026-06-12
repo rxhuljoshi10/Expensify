@@ -27,9 +27,6 @@ export default function TabsLayout() {
           fontSize: 11,
           fontWeight: '600',
         },
-        sceneContainerStyle: {
-          backgroundColor: theme.background,
-        },
       }}
     >
       <Tabs.Screen
@@ -61,7 +58,7 @@ export default function TabsLayout() {
           ),
           tabBarButton: (props) => (
             <TouchableOpacity
-              {...props}
+              {...(props as any)}
               onPress={() => router.push('/(tabs)/add')}
               style={styles.addButtonWrapper}
             />

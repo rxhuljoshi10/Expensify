@@ -38,12 +38,7 @@ export default function LoginScreen() {
   const onGoogleSignInPress = async () => {
     setLoading(true);
     try {
-      // In Expo Go, this generates `exp://<ip>:8081/--/auth/callback`
-      // In a standalone app, this generates `expensify://auth/callback`
-      const redirectUrl = makeRedirectUri({
-        scheme: 'expensify',
-        path: 'auth/callback',
-      });
+      const redirectUrl = makeRedirectUri();
       console.log('Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({

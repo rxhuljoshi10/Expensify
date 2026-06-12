@@ -10,8 +10,8 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splashscreen.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#6C63FF"
+      "resizeMode": "cover",
+      "backgroundColor": "#321448"
     },
     "ios": {
       "supportsTablet": true,
@@ -26,7 +26,7 @@
       "package": "com.rxhuljoshi.expensify",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#6C63FF"
+        "backgroundColor": "#03C775"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -53,7 +53,7 @@
       [
         "expo-notifications",
         {
-          "color": "#6C63FF",
+          "color": "#03C775",
           "sounds": []
         }
       ],
@@ -63,8 +63,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "dbfa44d7-75d1-4900-88d2-e6cc285479d6"
+        "projectId": "43ee118d-a4c0-4639-b5ce-b4b103384e11"
       }
-    }
+    },
+    "owner": "rxhuljoshi10"
   }
 }

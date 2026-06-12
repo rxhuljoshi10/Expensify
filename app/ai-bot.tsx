@@ -19,7 +19,7 @@ interface Message {
 const SUGGESTIONS = [
     'How much did I spend on food last week?',
     'What is my top spending category?',
-    'How much did I spend on travel last month',
+    'Give this month report',
     'How can i save more?',
 ];
 
@@ -95,7 +95,7 @@ export default function AIBotScreen() {
                 {/* Header */}
                 <View style={styles.headerRow}>
                     <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-                         <Ionicons name="arrow-back" size={24} color={theme.text} />
+                        <Ionicons name="arrow-back" size={24} color={theme.text} />
                     </TouchableOpacity>
                     <View style={styles.headerTextContainer}>
                         <Text style={styles.headerTitle}>AI Assistant</Text>
@@ -178,13 +178,13 @@ function createStyles(theme: Theme) {
     return StyleSheet.create({
         safe: { flex: 1, backgroundColor: theme.background },
         container: { flex: 1, backgroundColor: theme.background },
-        headerRow: { 
-            flexDirection: 'row', 
+        headerRow: {
+            flexDirection: 'row',
             alignItems: 'center',
-            padding: 20, 
-            paddingBottom: 12, 
-            borderBottomWidth: 0.5, 
-            borderColor: theme.border 
+            padding: 20,
+            paddingBottom: 12,
+            borderBottomWidth: 0.5,
+            borderColor: theme.border
         },
         backButton: {
             marginRight: 16,
