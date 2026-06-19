@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { getLocalISODate } from '../../lib/date';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,6 +31,12 @@ export default function HomeScreen() {
   const { data: group } = useFamilyGroup();
   const { viewMode, setViewMode } = useDashboardStore();
   const { data: recurring = [] } = useRecurring();
+
+  useEffect(() => {
+    if (!group && viewMode === 'group') {
+      setViewMode('personal');
+    }
+  }, [group, viewMode, setViewMode]);
 
   const dueTodayCount = recurring.filter(r => {
     return r.is_active && r.next_due_date === getLocalISODate();

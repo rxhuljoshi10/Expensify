@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { useDashboardStore } from './dashboardStore';
 
 interface AuthState {
     user: User | null;
@@ -21,6 +22,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     signOut: async () => {
         await supabase.auth.signOut();
+        useDashboardStore.getState().setViewMode('personal');
         set({ user: null, session: null });
     },
 

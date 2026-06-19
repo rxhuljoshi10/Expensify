@@ -38,16 +38,18 @@ export default function LoginScreen() {
   const onGoogleSignInPress = async () => {
     setLoading(true);
     try {
-      const redirectUrl = makeRedirectUri();
+      const redirectUrl = makeRedirectUri({
+        scheme: 'expensify',
+        // path: 'auth/callback',
+      });
       console.log('Redirect URL:', redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-        },
+        options: { redirectTo: redirectUrl }
       });
+      console.log('OAuth Data:', data);
+      console.log('OAuth Error:', error);
 
       if (error) throw error;
       if (!data?.url) throw new Error('No OAuth URL returned');

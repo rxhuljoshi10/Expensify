@@ -1,5 +1,5 @@
 // app/(tabs)/expenses.tsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, TouchableWithoutFeedback, StyleSheet, Alert, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,8 +23,17 @@ export default function ExpensesScreen() {
   const styles = createStyles(theme);
   const router = useRouter();
 
-  const { viewMode, setViewMode } = useDashboardStore();
+  const { viewMode: storedViewMode, setViewMode } = useDashboardStore();
   const { data: group } = useFamilyGroup();
+
+  const viewMode = group ? storedViewMode : 'personal';
+
+  useEffect(() => {
+    if (!group && storedViewMode === 'group') {
+      setViewMode('personal');
+    }
+  }, [group, storedViewMode, setViewMode]);
+
   const { data: personalExpenses = [], isLoading: isPersonalLoading } = useExpenses();
   const { data: groupExpenses = [], isLoading: isGroupLoading } = useGroupExpenses();
   const { mutate: deleteExpense } = useDeleteExpense();

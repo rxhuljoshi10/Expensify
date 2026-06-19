@@ -4,6 +4,7 @@ import { useExpenses, useGroupExpenses } from './useExpenses';
 import { useDashboardStore } from '../store/dashboardStore';
 import { Expense } from '../types/expense';
 import { CATEGORIES } from '../constants/categories';
+import { useFamilyGroup } from './useFamilyGroup';
 
 export type Period = 'today' | 'week' | 'month' | 'custom';
 
@@ -52,7 +53,10 @@ export const useDashboardStats = (
     customFrom?: Date,
     customTo?: Date,
 ) => {
-    const { viewMode } = useDashboardStore();
+    const { data: group } = useFamilyGroup();
+    const { viewMode: storedViewMode } = useDashboardStore();
+    const viewMode = group ? storedViewMode : 'personal';
+
     const { data: personalExpenses = [], isLoading: isPersonalLoading } = useExpenses();
     const { data: groupExpenses = [], isLoading: isGroupLoading } = useGroupExpenses();
 
