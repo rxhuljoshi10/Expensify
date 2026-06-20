@@ -46,6 +46,21 @@ export default function OnboardingScreen() {
                 return;
             }
 
+            // ── Write to public users table ───────────────────────────────────
+            // The expenses table has a FK: user_id → public.users(id).
+            // auth.updateUser() only writes to auth.users metadata, so we must
+            // explicitly upsert the public profile row here too.
+            await supabase
+                .from('users')
+                .upsert(
+                    {
+                        id: user!.id,
+                        name: trimmedName,
+                        email: user!.email ?? '',
+                    },
+                    { onConflict: 'id' }
+                );
+
             // Successfully updated
             toast.success('Profile created successfully!');
             

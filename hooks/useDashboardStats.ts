@@ -58,7 +58,7 @@ export const useDashboardStats = (
     const viewMode = group ? storedViewMode : 'personal';
 
     const { data: personalExpenses = [], isLoading: isPersonalLoading } = useExpenses();
-    const { data: groupExpenses = [], isLoading: isGroupLoading } = useGroupExpenses();
+    const { data: groupExpenses = [], isLoading: isGroupLoading } = useGroupExpenses(viewMode === 'group');
 
     const expenses = viewMode === 'group' ? groupExpenses : personalExpenses;
     const isLoading = viewMode === 'group' ? isGroupLoading : isPersonalLoading;

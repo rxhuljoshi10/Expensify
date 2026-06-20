@@ -126,7 +126,7 @@ export const useDeleteExpense = () => {
     });
 };
 
-export const useGroupExpenses = () => {
+export const useGroupExpenses = (isGroupView: boolean = true) => {
   const { user } = useAuthStore();
   const { data: group } = useFamilyGroup();
   const queryClient = useQueryClient();
@@ -136,25 +136,77 @@ export const useGroupExpenses = () => {
     queryFn: async (): Promise<(Expense & { member_name: string })[]> => {
       if (!group) return [];
 
-      // Get all member IDs including owner
-      const memberIds = [
-        group.owner_id,
-        ...(group.members?.map(m => m.user_id) ?? []),
+      // ── Helper: returns the later of two ISO timestamp strings ────────
+      // ISO timestamps are lexicographically comparable, so string >= works correctly.
+      const laterTs = (a: string, b: string): string => (a >= b ? a : b);
+
+      // ── Determine when the CURRENT VIEWER joined this group ───────────
+      // We use full ISO timestamps (not just dates) so same-day precision is exact.
+      // A member who joined at 17:36 cannot see expenses created at 10:00 on the same day.
+      let viewerJoinTs: string;
+      if (user?.id === group.owner_id) {
+        viewerJoinTs = group.created_at;           // owner "joined" when group was created
+      } else {
+        const viewerMember = group.members?.find(m => m.user_id === user?.id);
+        viewerJoinTs = viewerMember?.joined_at ?? new Date().toISOString(); // safe fallback = now
+      }
+
+      // ── Build per-member query specs ──────────────────────────────────
+      // Self   → null cutoff (always see your full own expense history)
+      // Others → cutoff = max(their_joined_at, viewer_joined_at)
+      //   Blocks both directions:
+      //   1. Others can't see a member's expenses created before that member joined
+      //   2. You can't see other members' expenses created before YOU joined
+      const memberSpecs = [
+        {
+          user_id: group.owner_id,
+          cutoff: group.owner_id === user?.id
+            ? null
+            : laterTs(group.created_at, viewerJoinTs),
+        },
+        ...(group.members?.map(m => ({
+          user_id: m.user_id,
+          cutoff: m.user_id === user?.id
+            ? null
+            : laterTs(m.joined_at, viewerJoinTs),
+        })) ?? []),
       ];
 
-      const { data, error } = await supabase
-        .from('expenses')
-        .select('*')
-        .in('user_id', memberIds)
-        .order('expense_date', { ascending: false })
-        .order('created_at', { ascending: false });
+      // ── Fire one query per member in parallel, each filtered at DB level ──
+      // Filter on created_at (full timestamp), NOT expense_date (date-only).
+      // This prevents same-day leakage: expenses created before the join time are excluded.
+      const results = await Promise.all(
+        memberSpecs.map(({ user_id, cutoff }) => {
+          const q = supabase
+            .from('expenses')
+            .select('*')
+            .eq('user_id', user_id);
 
-      if (error) throw error;
+          // Apply timestamp filter only when there is a cutoff (null = self, no filter)
+          return (cutoff ? q.gte('created_at', cutoff) : q)
+            .order('expense_date', { ascending: false })
+            .order('created_at', { ascending: false });
+        })
+      );
 
-      return (data ?? []).map(e => {
+      // Surface the first error if any query failed
+      const failed = results.find(r => r.error);
+      if (failed?.error) throw failed.error;
+
+      // Merge all results and re-sort (each sub-array is sorted, merged result is not)
+      const allExpenses = results
+        .flatMap(r => r.data ?? [])
+        .sort((a, b) => {
+          if (b.expense_date !== a.expense_date) {
+            return b.expense_date.localeCompare(a.expense_date);
+          }
+          return b.created_at.localeCompare(a.created_at);
+        });
+
+      return allExpenses.map(e => {
         const isOwner = e.user_id === group.owner_id;
         const isSelf = e.user_id === user?.id;
-        
+
         let mName = '';
 
         if (isSelf) {
@@ -165,7 +217,7 @@ export const useGroupExpenses = () => {
         if (!mName) {
             const member = group.members?.find(m => m.user_id === e.user_id);
             mName = member?.name ?? '';
-            
+
             if (!mName || mName.trim() === '') {
                 if (member?.email) {
                     mName = member.email.split('@')[0];
@@ -187,7 +239,8 @@ export const useGroupExpenses = () => {
         };
       });
     },
-    enabled: !!user && !!group,
+    // isGroupView = false when dashboard is in personal mode → skip this query entirely
+    enabled: !!user && !!group && isGroupView,
   });
 
   // ── Realtime subscription ─────────────────────────────────────────

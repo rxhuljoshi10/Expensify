@@ -95,6 +95,21 @@ export const useJoinGroup = () => {
         .eq('id', user!.id)
         .single();
 
+      // ── Ensure public users row exists ─────────────────────────────────
+      // Safety net: the expenses table FK requires user_id → public.users(id).
+      // If the user skipped onboarding or was created before this write was added,
+      // they won't have a row yet — upsert ensures one exists before they can add expenses.
+      await supabase
+        .from('users')
+        .upsert(
+          {
+            id: user!.id,
+            name: profile?.name ?? user!.user_metadata?.full_name ?? '',
+            email: profile?.email ?? user!.email ?? '',
+          },
+          { onConflict: 'id' }
+        );
+
       // Add user to members array
       const newMember: GroupMember = {
         user_id: user!.id,

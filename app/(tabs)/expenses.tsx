@@ -35,7 +35,7 @@ export default function ExpensesScreen() {
   }, [group, storedViewMode, setViewMode]);
 
   const { data: personalExpenses = [], isLoading: isPersonalLoading } = useExpenses();
-  const { data: groupExpenses = [], isLoading: isGroupLoading } = useGroupExpenses();
+  const { data: groupExpenses = [], isLoading: isGroupLoading } = useGroupExpenses(viewMode === 'group');
   const { mutate: deleteExpense } = useDeleteExpense();
 
   const expenses = viewMode === 'group' ? groupExpenses : personalExpenses;
