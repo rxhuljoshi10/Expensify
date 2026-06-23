@@ -60,6 +60,21 @@ export const useCreateGroup = () => {
         .single();
 
       if (error) throw error;
+
+      // ── Ensure owner's public profile exists ───────────────────────────────
+      // Members will fetch the owner's name from public.users when they view the group.
+      // Upsert here ensures the row exists with the correct name from the moment of creation.
+      await supabase
+        .from('users')
+        .upsert(
+          {
+            id: user!.id,
+            name: user!.user_metadata?.full_name ?? '',
+            email: user!.email ?? '',
+          },
+          { onConflict: 'id' }
+        );
+
       return data;
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
@@ -177,6 +192,22 @@ export const useLeaveGroup = () => {
       const { error } = await supabase
         .from('family_groups')
         .update({ members: updated })
+        .eq('id', groupId);
+      if (error) throw error;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+  });
+};
+
+// Delete a group (owner only)
+export const useDeleteGroup = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (groupId: string) => {
+      const { error } = await supabase
+        .from('family_groups')
+        .delete()
         .eq('id', groupId);
       if (error) throw error;
     },

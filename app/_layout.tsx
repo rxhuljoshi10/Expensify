@@ -85,6 +85,22 @@ function AuthGuard() {
     }
   }, [session, isLoading, segments]);
 
+  // ── Sync user profile to public.users on every app open ──────────────
+  // Many users completed onboarding before the public.users write was added,
+  // so their name lives only in auth metadata. This upsert fixes that silently
+  // and ensures group members always see the real name (not email / "Admin").
+  useEffect(() => {
+    if (!session?.user) return;
+    const { id, email, user_metadata } = session.user;
+    const fullName = user_metadata?.full_name;
+    if (!fullName) return; // No name yet — user will be sent to onboarding
+
+    supabase.from('users').upsert(
+      { id, name: fullName, email: email ?? '' },
+      { onConflict: 'id' }
+    );
+  }, [session?.user?.id]);
+
   // Block rendering until we know the auth state.
   if (isLoading) {
     return (

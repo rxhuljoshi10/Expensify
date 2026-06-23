@@ -1,5 +1,5 @@
 // app/family.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity,
     StyleSheet, Alert, Share, ScrollView,
@@ -7,11 +7,12 @@ import {
 } from 'react-native';
 import {
     useFamilyGroup, useCreateGroup,
-    useJoinGroup, useRemoveMember, useLeaveGroup,
+    useJoinGroup, useRemoveMember, useLeaveGroup, useDeleteGroup,
 } from '../hooks/useFamilyGroup';
 import { useAuthStore } from '../store/authStore';
 import { GroupMember } from '../types/expense';
 import { toast } from '../lib/toast';
+import { supabase } from '../lib/supabase';
 import { useTheme, Theme } from '../lib/theme';
 
 export default function FamilyScreen() {
@@ -23,12 +24,47 @@ export default function FamilyScreen() {
     const { mutate: joinGroup, isPending: isJoining } = useJoinGroup();
     const { mutate: removeMember } = useRemoveMember();
     const { mutate: leaveGroup } = useLeaveGroup();
+    const { mutate: deleteGroup } = useDeleteGroup();
 
     const [groupName, setGroupName] = useState('');
     const [inviteCode, setInviteCode] = useState('');
     const [mode, setMode] = useState<'none' | 'create' | 'join'>('none');
 
     const isOwner = group?.owner_id === user?.id;
+
+    // ── Owner: silently sync own public.users row when opening this screen ──
+    // This ensures members can always see the owner's real name the next load.
+    useEffect(() => {
+        if (!group || !isOwner || !user) return;
+        supabase.from('users').upsert(
+            {
+                id: user.id,
+                name: user.user_metadata?.full_name ?? '',
+                email: user.email ?? '',
+            },
+            { onConflict: 'id' }
+        );
+    }, [group?.id, isOwner]);
+
+    // ── Member-viewer: fetch the owner's real profile from public.users ──
+    const [ownerProfile, setOwnerProfile] = useState<{ name: string; email: string } | null>(null);
+    useEffect(() => {
+        if (!group || isOwner) return;
+        supabase
+            .from('users')
+            .select('name, email')
+            .eq('id', group.owner_id)
+            .single()
+            .then(({ data }) => {
+                if (data) {
+                    // Use email username as fallback if name is null/empty
+                    setOwnerProfile({
+                        name: data.name?.trim() || data.email?.split('@')[0] || 'Admin',
+                        email: data.email ?? '',
+                    });
+                }
+            });
+    }, [group?.owner_id, isOwner]);
 
     const handleCreate = () => {
         if (!groupName.trim()) {
@@ -112,6 +148,25 @@ export default function FamilyScreen() {
         );
     };
 
+    const handleDeleteGroup = () => {
+        Alert.alert(
+            'Delete group',
+            'This will permanently delete the group and remove all members. This cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete', style: 'destructive',
+                    onPress: () => {
+                        deleteGroup(group!.id, {
+                            onSuccess: () => toast.success('Group deleted'),
+                            onError: (e) => toast.error(e.message),
+                        });
+                    },
+                },
+            ]
+        );
+    };
+
     if (isLoading) {
         return (
             <View style={styles.centered}>
@@ -146,16 +201,25 @@ export default function FamilyScreen() {
                 <View style={styles.memberRow}>
                     <View style={styles.avatar}>
                         <Text style={styles.avatarText}>
-                            {(group.members?.find(m => m.user_id === group.owner_id)?.name?.[0]
-                                ?? user?.email?.[0] ?? '?').toUpperCase()}
+                            {isOwner
+                                ? (user?.user_metadata?.full_name?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()
+                                : (ownerProfile?.name?.[0] ?? 'A').toUpperCase()}
                         </Text>
                     </View>
                     <View style={styles.memberInfo}>
                         <Text style={styles.memberName} numberOfLines={1}>
-                            {group.owner_id === user?.id ? 'You' : 'Owner'}
+                            {isOwner ? 'You' : (ownerProfile?.name || 'Group Admin')}
                         </Text>
-                        <Text style={styles.memberRole}>Owner</Text>
+                        <Text style={styles.memberRole}>
+                            {isOwner ? user?.email : ownerProfile?.email ?? ''}
+                        </Text>
                     </View>
+                    {/* Admin badge — shown only to non-owner members */}
+                    {!isOwner && (
+                        <View style={styles.adminBadge}>
+                            <Text style={styles.adminBadgeText}>Admin</Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Member rows */}
@@ -184,6 +248,13 @@ export default function FamilyScreen() {
                 {!isOwner && (
                     <TouchableOpacity style={styles.leaveButton} onPress={handleLeave}>
                         <Text style={styles.leaveButtonText}>Leave group</Text>
+                    </TouchableOpacity>
+                )}
+
+                {/* Delete group — owner only */}
+                {isOwner && (
+                    <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteGroup}>
+                        <Text style={styles.deleteButtonText}>Delete group</Text>
                     </TouchableOpacity>
                 )}
             </ScrollView>
@@ -317,12 +388,23 @@ function createStyles(theme: Theme) {
         memberName: { fontSize: 15, fontWeight: '500', color: theme.text },
         memberRole: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
         removeText: { fontSize: 13, color: theme.danger },
+        adminBadge: {
+            backgroundColor: theme.primary + '18',
+            borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+            borderWidth: 1, borderColor: theme.primary + '40',
+        },
+        adminBadgeText: { fontSize: 12, fontWeight: '700', color: theme.primary },
 
         leaveButton: {
             borderWidth: 1, borderColor: theme.danger, borderRadius: 12,
             padding: 16, alignItems: 'center', marginTop: 32,
         },
         leaveButtonText: { color: theme.danger, fontSize: 15, fontWeight: '500' },
+        deleteButton: {
+            borderWidth: 1, borderColor: theme.danger, borderRadius: 12,
+            padding: 16, alignItems: 'center', marginTop: 16, marginBottom: 8,
+        },
+        deleteButtonText: { color: theme.danger, fontSize: 15, fontWeight: '500' },
 
         optionsContainer: { gap: 16 },
         optionCard: {
