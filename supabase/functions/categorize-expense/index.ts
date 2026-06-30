@@ -20,7 +20,12 @@ serve(async (req) => {
   }
 
   try {
-    const { merchant, description } = await req.json();
+    const { merchant, description, categories } = await req.json();
+
+    // Use custom user categories if provided, otherwise default to system constants
+    const targetCategories = Array.isArray(categories) && categories.length > 0 
+      ? categories 
+      : CATEGORIES;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -31,7 +36,7 @@ serve(async (req) => {
         contents: [{
           parts: [{
             text: `You are an expense categorizer. Given a merchant name and optional description, return ONLY the single best category from this list with no explanation:
-${CATEGORIES.join(', ')}
+${targetCategories.join(', ')}
 
 Merchant: ${merchant}
 Description: ${description ?? ''}
@@ -48,10 +53,10 @@ Reply with exactly one category name from the list above.`
     const data = await response.json();
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
 
-    // Validate the response is actually one of our categories
-    const category = CATEGORIES.find(
+    // Validate the response is actually one of our target categories
+    const category = targetCategories.find(
       c => c.toLowerCase() === raw.toLowerCase()
-    ) ?? 'Other';
+    ) ?? (targetCategories.includes('Other') ? 'Other' : targetCategories[0]);
 
     return new Response(
       JSON.stringify({ category }),

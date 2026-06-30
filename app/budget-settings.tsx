@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Keyboa
 import { toast } from '../lib/toast';
 import { useRouter } from 'expo-router';
 import { useBudget, useSetBudget } from '../hooks/useBudget';
-import { CATEGORIES } from '../constants/categories';
+import { useUserCategories } from '../hooks/useUserCategories';
 import { rupeesToPaise } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ export default function BudgetSettingsScreen() {
     const router = useRouter();
     const { data: budget } = useBudget();
     const { mutate: setBudget, isPending } = useSetBudget();
+    const { categories } = useUserCategories();
 
     const [totalBudget, setTotalBudget] = useState('');
     const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>({});
@@ -83,8 +84,8 @@ export default function BudgetSettingsScreen() {
                 <Text style={styles.sectionTitle}>Per-category limits (optional)</Text>
                 <Text style={styles.sectionSubtext}>Leave blank to skip a category</Text>
 
-                {CATEGORIES.map(cat => (
-                    <View key={cat.name} style={styles.categoryRow}>
+                {categories.map(cat => (
+                    <View key={cat.id} style={styles.categoryRow}>
                         <Ionicons name={cat.icon as any} size={20} color={cat.color} />
                         <Text style={styles.categoryName}>{cat.name}</Text>
                         <TextInput

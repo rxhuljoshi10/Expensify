@@ -312,6 +312,16 @@ export default function ProfileScreen() {
             <Text style={[styles.rowContent, styles.rowLabel]}>Budget Settings</Text>
             <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
           </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/manage-categories')}>
+            <View style={[styles.rowIcon, { backgroundColor: '#FFB34722' }]}>
+              <Ionicons name="settings-outline" size={17} color="#FFB347" />
+            </View>
+            <Text style={[styles.rowContent, styles.rowLabel]}>Manage Categories</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         {/* ── More ── */}

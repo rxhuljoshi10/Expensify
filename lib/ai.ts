@@ -5,7 +5,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { Alert } from 'react-native';
 import { ExpenseItem } from '../types/expense';
 
-export const parseVoiceExpense = async (audioUri: string): Promise<{
+export const parseVoiceExpense = async (audioUri: string, categories?: string[]): Promise<{
   transcript: string;
   expenses: { amount: number; merchant: string; category: string }[];
 } | null> => {
@@ -22,6 +22,9 @@ export const parseVoiceExpense = async (audioUri: string): Promise<{
       type: mimeType,
     } as any);
     formData.append('today', today);
+    if (categories) {
+      formData.append('categories', JSON.stringify(categories));
+    }
 
     const { data, error } = await supabase.functions.invoke('parse-voice-expense', {
       body: formData,
@@ -52,10 +55,11 @@ export const parseVoiceExpense = async (audioUri: string): Promise<{
 export const categorizeExpense = async (
   merchant: string,
   description?: string,
+  categories?: string[],
 ): Promise<string> => {
   try {
     const { data, error } = await supabase.functions.invoke('categorize-expense', {
-      body: { merchant, description },
+      body: { merchant, description, categories },
     });
     if (error) throw error;
     return data.category ?? 'Other';
@@ -65,7 +69,7 @@ export const categorizeExpense = async (
 };
 
 
-export const pickAndScanBill = async (): Promise<{
+export const pickAndScanBill = async (categories?: string[]): Promise<{
   merchant: string;
   total: number | null;
   date: string | null;
@@ -127,6 +131,7 @@ export const pickAndScanBill = async (): Promise<{
       body: {
         imageBase64: compressed.base64,
         today,
+        categories,
       },
     });
 

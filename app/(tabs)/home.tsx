@@ -12,6 +12,7 @@ import DailyBarChart from '../../components/DailyBarChart';
 import DashboardInsights from '../../components/DashboardInsights';
 import RecentExpenses from '../../components/RecentExpenses';
 import { useBudget } from '../../hooks/useBudget';
+import { useUserCategories } from '../../hooks/useUserCategories';
 import BudgetCard from '../../components/BudgetCard';
 import DashboardSkeleton from '../../components/DashboardSkeleton';
 import { useTheme, Theme } from '../../lib/theme';
@@ -42,12 +43,16 @@ export default function HomeScreen() {
     return r.is_active && r.next_due_date === getLocalISODate();
   }).length;
 
+  const { categories, isLoading: isCategoriesLoading } = useUserCategories();
+
   const {
-    isLoading, todayTotal, weekTotal, monthTotal, periodTotal,
+    isLoading: isStatsLoading, todayTotal, weekTotal, monthTotal, periodTotal,
     byCategory, monthByCategory, historicalWeeksData, recentExpenses,
     topCategory, averageDailySpend, largestExpense,
     memberBreakdown
-  } = useDashboardStats(period);
+  } = useDashboardStats(period, undefined, undefined, categories);
+
+  const isLoading = isStatsLoading || isCategoriesLoading;
 
   const styles = createStyles(theme);
 

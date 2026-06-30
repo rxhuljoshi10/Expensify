@@ -2,8 +2,8 @@
 import { useMemo } from 'react';
 import { useExpenses, useGroupExpenses } from './useExpenses';
 import { useDashboardStore } from '../store/dashboardStore';
-import { Expense } from '../types/expense';
-import { CATEGORIES } from '../constants/categories';
+import { Expense, UserCategory } from '../types/expense';
+import { DEFAULT_CATEGORIES } from '../constants/categories';
 import { useFamilyGroup } from './useFamilyGroup';
 
 export type Period = 'today' | 'week' | 'month' | 'custom';
@@ -52,6 +52,7 @@ export const useDashboardStats = (
     period: Period,
     customFrom?: Date,
     customTo?: Date,
+    categoriesList?: UserCategory[],
 ) => {
     const { data: group } = useFamilyGroup();
     const { viewMode: storedViewMode } = useDashboardStore();
@@ -63,6 +64,8 @@ export const useDashboardStats = (
     const expenses = viewMode === 'group' ? groupExpenses : personalExpenses;
     const isLoading = viewMode === 'group' ? isGroupLoading : isPersonalLoading;
 
+    const categories = categoriesList && categoriesList.length > 0 ? categoriesList : DEFAULT_CATEGORIES;
+
     return useMemo(() => {
         // Always compute today/week/month regardless of selected period
         const todayTotal = filterByPeriod(expenses, 'today')
@@ -72,7 +75,7 @@ export const useDashboardStats = (
         const monthExpenses = filterByPeriod(expenses, 'month');
         const monthTotal = monthExpenses.reduce((s, e) => s + e.amount, 0);
 
-        const monthByCategory = CATEGORIES.map(cat => {
+        const monthByCategory = categories.map(cat => {
             const total = monthExpenses
                 .filter(e => e.category === cat.name)
                 .reduce((s, e) => s + e.amount, 0);
@@ -98,7 +101,7 @@ export const useDashboardStats = (
         const memberBreakdown = Object.entries(byMember).map(([id, v]) => ({ id, ...v }));
 
         // Category breakdown for pie chart
-        const byCategory = CATEGORIES.map(cat => {
+        const byCategory = categories.map(cat => {
             const total = periodExpenses
                 .filter(e => e.category === cat.name)
                 .reduce((s, e) => s + e.amount, 0);
@@ -203,5 +206,5 @@ export const useDashboardStats = (
             averageDailySpend,
             largestExpense,
         };
-    }, [expenses, period, customFrom, customTo, viewMode]);
+    }, [expenses, period, customFrom, customTo, viewMode, categories]);
 };

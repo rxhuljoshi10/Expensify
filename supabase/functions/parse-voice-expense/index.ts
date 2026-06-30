@@ -25,6 +25,12 @@ serve(async (req) => {
     const formData = await req.formData();
     const audioFile = formData.get('audio') as File;
     const today = formData.get('today') as string;
+    const categoriesRaw = formData.get('categories') as string | null;
+    const categories = categoriesRaw ? JSON.parse(categoriesRaw) : null;
+
+    const targetCategories = Array.isArray(categories) && categories.length > 0
+      ? categories
+      : CATEGORIES;
 
     const fileName = audioFile.name || 'audio.wav';
     const ext = fileName.split('.').pop()?.toLowerCase();
@@ -90,7 +96,7 @@ Extract ALL expenses mentioned and return them as a JSON array.
 Each object in the array must have exactly these fields:
 - "amount": a plain number (no currency symbols, no commas)
 - "merchant": the merchant or vendor name
-- "category": the best matching category from this list: ${CATEGORIES.join(', ')}
+- "category": the best matching category from this list: ${targetCategories.join(', ')}
 
 Rules:
 - If only one expense is mentioned, still return an array with one element.
@@ -98,10 +104,10 @@ Rules:
 - If an amount is ambiguous (e.g. "3k"), convert it to a number (3000).
 
 Example input: "zudio 3000, dmart 1000, chicken biryani 250"
-Example output: [{"amount":3000,"merchant":"Zudio","category":"Shopping"},{"amount":1000,"merchant":"DMart","category":"Shopping"},{"amount":250,"merchant":"Chicken Biryani","category":"Food"}]
+Example output: [{"amount":3000,"merchant":"Zudio","category":"${targetCategories[0]}"},{"amount":1000,"merchant":"DMart","category":"${targetCategories[0]}"},{"amount":250,"merchant":"Chicken Biryani","category":"${targetCategories[0]}"}]
 
 Example input: "Spent 200 on Uber ride"
-Example output: [{"amount":200,"merchant":"Uber","category":"Transport"}]
+Example output: [{"amount":200,"merchant":"Uber","category":"${targetCategories.includes('Transport') ? 'Transport' : targetCategories[0]}"}]
 
 Input: "${transcript}"
 Output:`
@@ -141,9 +147,9 @@ Output:`
         const amount = parseFloat(String(item.amount));
         if (isNaN(amount) || amount <= 0) return null;
         const merchant = String(item.merchant || '').trim() || 'Unknown';
-        const category = CATEGORIES.find(
+        const category = targetCategories.find(
           (c) => c.toLowerCase() === String(item.category || '').toLowerCase()
-        ) ?? 'Other';
+        ) ?? (targetCategories.includes('Other') ? 'Other' : targetCategories[0]);
         return { amount, merchant, category };
       })
       .filter(Boolean) as { amount: number; merchant: string; category: string }[];

@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, LayoutAnimation, 
 import { useTheme, Theme } from '../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { formatAmount } from '../lib/currency';
-import { getCategoryMeta } from '../constants/categories';
+import { useUserCategories } from '../hooks/useUserCategories';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     const isFabric = (global as any).nativeFabricUIManager != null;
@@ -14,6 +14,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 function CompactExpenseRow({ expense, theme }: { expense: any; theme: Theme }) {
+    const { getCategoryMeta } = useUserCategories();
     const cat = getCategoryMeta(expense.category);
     const memberName = expense.member_name;
     return (

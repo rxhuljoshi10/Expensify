@@ -2,9 +2,10 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Expense } from '../types/expense';
-import { getCategoryMeta } from '../constants/categories';
+import { useUserCategories } from '../hooks/useUserCategories';
 import { formatAmount } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Props { expenses: Expense[]; }
 
@@ -12,6 +13,7 @@ export default function RecentExpenses({ expenses }: Props) {
     const theme = useTheme();
     const styles = createStyles(theme);
     const router = useRouter();
+    const { getCategoryMeta } = useUserCategories();
 
     return (
         <View style={styles.container}>
@@ -30,7 +32,7 @@ export default function RecentExpenses({ expenses }: Props) {
                     return (
                         <TouchableOpacity key={e.id} style={styles.row} onPress={() => router.push(`/edit-expense?id=${e.id}`)}>
                             <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
-                                <Text style={styles.icon}>{cat.icon}</Text>
+                                <Ionicons name={cat.icon as any} size={18} color={cat.color} />
                             </View>
                             <View style={styles.info}>
                                 <Text style={styles.merchant} numberOfLines={1}>{e.merchant}</Text>

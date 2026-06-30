@@ -64,7 +64,7 @@ function safeParseJson(raw: string): object {
   return JSON.parse(text);
 }
 
-async function parseReceiptText(ocrText: string, today: string): Promise<object> {
+async function parseReceiptText(ocrText: string, today: string, targetCategories: string[]): Promise<object> {
   // Safely encode the OCR text so special characters (", \, newlines) don't
   // corrupt the JSON payload sent to the Gemini API.
   const safeOcrText = JSON.stringify(ocrText);
@@ -73,7 +73,7 @@ async function parseReceiptText(ocrText: string, today: string): Promise<object>
 Return ONLY a single valid JSON object with NO explanation, NO markdown, NO code fences.
 
 Today's date: ${today}
-Categories available: ${CATEGORIES.join(', ')}
+Categories available: ${targetCategories.join(', ')}
 
 OCR Text (JSON-encoded string, decode before reading):
 ${safeOcrText}
@@ -135,7 +135,7 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, today } = await req.json();
+    const { imageBase64, today, categories } = await req.json();
 
     if (!imageBase64) {
       throw new Error('No image provided');
@@ -143,11 +143,24 @@ serve(async (req) => {
 
     const todayStr = today ?? new Date().toISOString().split('T')[0];
 
+    // Use custom user categories if provided, otherwise default to system constants
+    const targetCategories = Array.isArray(categories) && categories.length > 0
+      ? categories
+      : CATEGORIES;
+
     // Run Vision OCR
     const ocrText = await extractTextFromImage(imageBase64);
 
     // Parse with Gemini as a flat object
-    const parsed = await parseReceiptText(ocrText, todayStr) as any;
+    const parsed = await parseReceiptText(ocrText, todayStr, targetCategories) as any;
+
+    // Validate the response category actually matches one of targetCategories
+    if (parsed.category) {
+      const matched = targetCategories.find(c => c.toLowerCase() === parsed.category.toLowerCase());
+      parsed.category = matched ?? (targetCategories.includes('Other') ? 'Other' : targetCategories[0]);
+    } else {
+      parsed.category = targetCategories.includes('Other') ? 'Other' : targetCategories[0];
+    }
 
     return new Response(
       JSON.stringify({ ...parsed, ocrText }),

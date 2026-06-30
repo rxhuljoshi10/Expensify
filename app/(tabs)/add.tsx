@@ -8,6 +8,7 @@ import { toast } from '../../lib/toast';
 import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAddExpense } from '../../hooks/useExpenses';
+import { useUserCategories } from '../../hooks/useUserCategories';
 import CategoryPicker from '../../components/CategoryPicker';
 import { rupeesToPaise } from '../../lib/currency';
 import { Category, ExpenseItem } from '../../types/expense';
@@ -27,11 +28,13 @@ export default function AddExpenseScreen() {
     const router = useRouter();
     const { mutate: addExpense, isPending } = useAddExpense();
     const { user } = useAuthStore();
+    const { categories, trackCategoryUsage } = useUserCategories();
 
     const [amount, setAmount] = useState('');
     const [merchant, setMerchant] = useState('');
     const [description, setDescription] = useState('');
-    const [category, setCategory] = useState<Category>('Food');
+    const [category, setCategory] = useState<string | null>(null);
+
     const [date, setDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [errors, setErrors] = useState<{ amount?: string; merchant?: string }>({});
@@ -76,7 +79,7 @@ export default function AddExpenseScreen() {
             const uri = await stopRecording();
             if (!uri) return;
 
-            const result = await parseVoiceExpense(uri);
+            const result = await parseVoiceExpense(uri, categories.map(c => c.name));
             if (!result || result.expenses.length === 0) {
                 toast.error("Couldn't understand that. Try again.");
                 resetVoice();
@@ -151,9 +154,18 @@ export default function AddExpenseScreen() {
         const parsed = parseFloat(amount);
 
         const doSave = async (storagePath: string | null) => {
+            let finalCategory = category;
+            if (!finalCategory) {
+                try {
+                    finalCategory = await categorizeExpense(merchant.trim(), description.trim(), categories.map(c => c.name));
+                } catch {
+                    finalCategory = 'Other';
+                }
+            }
+
             addExpense({
                 amount: rupeesToPaise(parsed),
-                category,
+                category: finalCategory,
                 merchant: merchant.trim(),
                 description: description.trim(),
                 expense_date: getLocalISODate(date),
@@ -162,11 +174,14 @@ export default function AddExpenseScreen() {
                 source,
             }, {
                 onSuccess: () => {
+                    if (finalCategory) {
+                        trackCategoryUsage(finalCategory);
+                    }
                     toast.success('Expense added');
                     setAmount('');
                     setMerchant('');
                     setDescription('');
-                    setCategory('Food');
+                    setCategory(null);
                     setDate(new Date());
                     setErrors({});
                     setAttachmentUri(null);
@@ -198,7 +213,7 @@ export default function AddExpenseScreen() {
     const handleScanBill = async () => {
         setIsScanning(true);
 
-        const result = await pickAndScanBill();
+        const result = await pickAndScanBill(categories.map(c => c.name));
         setIsScanning(false);
 
         if (!result) {
@@ -260,13 +275,13 @@ export default function AddExpenseScreen() {
         clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(async () => {
             setIsCategorizing(true);
-            const suggested = await categorizeExpense(merchant, description);
-            setCategory(suggested as Category);
+            const suggested = await categorizeExpense(merchant, description, categories.map(c => c.name));
+            setCategory(suggested);
             setIsCategorizing(false);
         }, 600);
 
         return () => clearTimeout(debounceRef.current);
-    }, [merchant]);
+    }, [merchant, categories]);
 
     return (
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -334,7 +349,7 @@ export default function AddExpenseScreen() {
                         <Text style={{ fontSize: 12, color: '#6C63FF' }}>AI suggesting...</Text>
                     )}
                 </View>
-                <CategoryPicker selected={category} onSelect={setCategory} />
+                <CategoryPicker selected={category} onSelect={(c) => setCategory(c)} />
 
                 <Text style={styles.label}>Date</Text>
                 <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>

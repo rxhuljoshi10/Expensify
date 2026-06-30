@@ -1,8 +1,15 @@
 // types/expense.ts
-export type Category =
-    | 'Food' | 'Transport' | 'Shopping' | 'Health'
-    | 'Entertainment' | 'Home' | 'Education' | 'Bills'
-    | 'Personal' | 'Travel' | 'Fitness' | 'Other';
+export type Category = string;
+
+export interface UserCategory {
+    id: string;
+    user_id: string;
+    name: string;
+    icon: string;       // Ionicons icon name
+    color: string;      // Hex color code
+    last_used_at?: string;
+    created_at?: string;
+}
 
 export interface ExpenseItem {
     name: string;

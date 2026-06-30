@@ -9,6 +9,7 @@ import {
 import { toast } from '../lib/toast';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useExpenses, useUpdateExpense, useDeleteExpense } from '../hooks/useExpenses';
+import { useUserCategories } from '../hooks/useUserCategories';
 import CategoryPicker from '../components/CategoryPicker';
 import { rupeesToPaise } from '../lib/currency';
 import { Category, ExpenseItem } from '../types/expense';
@@ -32,6 +33,7 @@ export default function EditExpenseScreen() {
     const { mutate: updateExpense, isPending } = useUpdateExpense();
     const { mutate: deleteExpense } = useDeleteExpense();
     const { user } = useAuthStore();
+    const { trackCategoryUsage } = useUserCategories();
 
     const expense = expenses.find(e => e.id === id);
 
@@ -113,7 +115,13 @@ export default function EditExpenseScreen() {
                 // undefined → don't touch, null → clear, string → new path
                 ...(storagePath !== undefined ? { attachment_url: storagePath } : {}),
             }, {
-                onSuccess: () => { toast.success('Expense updated'); router.back(); },
+                onSuccess: () => {
+                    if (category) {
+                        trackCategoryUsage(category);
+                    }
+                    toast.success('Expense updated');
+                    router.back();
+                },
                 onError: (e) => { toast.error(e.message); },
             });
         };

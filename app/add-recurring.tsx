@@ -1,5 +1,4 @@
-// app/add-recurring.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getLocalISODate } from '../lib/date';
 import {
     View, Text, TextInput, TouchableOpacity,
@@ -8,6 +7,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAddRecurring } from '../hooks/useRecurring';
+import { useUserCategories } from '../hooks/useUserCategories';
 import CategoryPicker from '../components/CategoryPicker';
 import { rupeesToPaise } from '../lib/currency';
 import { Category, RecurringFrequency } from '../types/expense';
@@ -26,10 +26,17 @@ export default function AddRecurringScreen() {
     const theme = useTheme();
     const styles = createStyles(theme);
     const { mutate: addRecurring, isPending } = useAddRecurring();
+    const { categories, trackCategoryUsage } = useUserCategories();
 
     const [amount, setAmount] = useState('');
     const [merchant, setMerchant] = useState('');
     const [category, setCategory] = useState<Category>('Bills');
+
+    useEffect(() => {
+        if (categories.length > 0 && !categories.some(c => c.name === category)) {
+            setCategory(categories[0].name);
+        }
+    }, [categories]);
     const [frequency, setFrequency] = useState<RecurringFrequency>('monthly');
     const [startDate, setStartDate] = useState(getLocalISODate());
     const [errors, setErrors] = useState<{ amount?: string; merchant?: string }>({});
@@ -56,7 +63,9 @@ export default function AddRecurringScreen() {
             next_due_date: startDate,
         }, {
             onSuccess: () => {
-
+                if (category) {
+                    trackCategoryUsage(category);
+                }
                 toast.success('Recurring expense added');
                 router.back();
             },

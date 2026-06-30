@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import {
     useRecurring, useToggleRecurring, useDeleteRecurring,
 } from '../hooks/useRecurring';
-import { getCategoryMeta } from '../constants/categories';
+import { useUserCategories } from '../hooks/useUserCategories';
 import { formatAmount } from '../lib/currency';
 import { RecurringExpense, RecurringFrequency } from '../types/expense';
 import { toast } from '../lib/toast';
@@ -35,6 +35,7 @@ export default function RecurringScreen() {
     const { data: recurring = [], isLoading } = useRecurring();
     const { mutate: toggleRecurring } = useToggleRecurring();
     const { mutate: deleteRecurring } = useDeleteRecurring();
+    const { getCategoryMeta } = useUserCategories();
 
     const handleToggle = (item: RecurringExpense) => {
         toggleRecurring({ id: item.id, is_active: !item.is_active }, {

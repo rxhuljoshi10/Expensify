@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, Theme } from '../lib/theme';
 import { Expense, ExpenseItem } from '../types/expense';
-import { getCategoryMeta } from '../constants/categories';
+import { useUserCategories } from '../hooks/useUserCategories';
 import { formatAmount } from '../lib/currency';
 import { getReceiptSignedUrl } from '../lib/storage';
 
@@ -23,6 +23,7 @@ interface Props {
 export default function ExpenseDetailSheet({ expense, onClose, onEdit, onDelete }: Props) {
     const theme = useTheme();
     const styles = createStyles(theme);
+    const { getCategoryMeta } = useUserCategories();
 
     // Track sheet height to dynamically slide down by the right amount
     const sheetHeight = useRef(700);

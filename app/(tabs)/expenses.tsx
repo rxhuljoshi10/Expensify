@@ -7,8 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useExpenses, useGroupExpenses, useDeleteExpense } from '../../hooks/useExpenses';
 import ExpenseRow from '../../components/ExpenseRow';
 import ExpenseDetailSheet from '../../components/ExpenseDetailSheet';
-import { CATEGORIES } from '../../constants/categories';
-import { Category, Expense } from '../../types/expense';
+import { useUserCategories } from '../../hooks/useUserCategories';
+import { Expense } from '../../types/expense';
 import ExpenseListSkeleton from '../../components/ExpenseListSkeleton';
 import { useTheme, Theme } from '../../lib/theme';
 import { useDashboardStore } from '../../store/dashboardStore';
@@ -41,8 +41,10 @@ export default function ExpensesScreen() {
   const expenses = viewMode === 'group' ? groupExpenses : personalExpenses;
   const isLoading = viewMode === 'group' ? isGroupLoading : isPersonalLoading;
 
+  const { categories } = useUserCategories();
+
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<Category | 'All'>('All');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
 
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -193,14 +195,14 @@ export default function ExpensesScreen() {
         <View style={styles.filterContainer}>
           <FlatList
             horizontal
-            data={[{ name: 'All', icon: '✨', color: '#6C63FF' }, ...CATEGORIES]}
+            data={[{ name: 'All', icon: '✨', color: '#6C63FF' }, ...categories]}
             keyExtractor={i => i.name}
             showsHorizontalScrollIndicator={false}
             style={styles.filterRow}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={[styles.filterChip, activeCategory === item.name && styles.filterChipActive]}
-                onPress={() => setActiveCategory(item.name as Category | 'All')}
+                onPress={() => setActiveCategory(item.name)}
               >
                 <Text style={[styles.filterChipText, activeCategory === item.name && styles.filterChipTextActive]}>
                   {item.name}

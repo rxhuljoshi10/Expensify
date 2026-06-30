@@ -1,7 +1,7 @@
 // components/ExpenseRow.tsx
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Expense } from '../types/expense';
-import { getCategoryMeta } from '../constants/categories';
+import { useUserCategories } from '../hooks/useUserCategories';
 import { formatAmount } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,7 @@ interface Props {
 export default function ExpenseRow({ expense, onPress, onLongPress }: Props) {
     const theme = useTheme();
     const styles = createStyles(theme);
+    const { getCategoryMeta } = useUserCategories();
     const cat = getCategoryMeta(expense.category);
 
     return (
