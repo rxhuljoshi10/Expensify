@@ -290,18 +290,16 @@ export default function ProfileScreen() {
 
           <View style={styles.divider} />
 
-          <View style={styles.row}>
+          <TouchableOpacity style={styles.row} onPress={() => router.push('/notification-settings')}>
             <View style={[styles.rowIcon, { backgroundColor: '#F7B73122' }]}>
               <Ionicons name="notifications-outline" size={17} color="#F7B731" />
             </View>
-            <Text style={[styles.rowContent, styles.rowLabel]}>Push Notifications</Text>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{ false: theme.border, true: theme.primary }}
-              thumbColor="#fff"
-            />
-          </View>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>Notifications</Text>
+              <Text style={styles.rowValue}>{notificationsEnabled ? 'Enabled' : 'Disabled'}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
+          </TouchableOpacity>
 
           <View style={styles.divider} />
 

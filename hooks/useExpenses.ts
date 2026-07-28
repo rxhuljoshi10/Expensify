@@ -44,10 +44,19 @@ export const useAddExpense = () => {
                 .single();
             if (error) throw error;
 
-            // Fire budget check in background — don't await
-            supabase.functions.invoke('send-notifications', {
-                body: { type: 'budget', userId: user!.id },
-            }).catch(console.error);
+            // Fire notification checks in background — don't await
+            const invoke = (type: string, extra: object = {}) =>
+                supabase.functions.invoke('send-notifications', {
+                    body: { type, userId: user!.id, ...extra },
+                }).catch(console.error);
+
+            invoke('budget');
+            invoke('spending-spike', { category: input.category });
+            invoke('family-expense', {
+                amount: input.amount,
+                category: input.category,
+                merchant: input.merchant,
+            });
 
             return data;
         },

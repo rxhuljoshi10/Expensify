@@ -18,6 +18,11 @@ const queryClient = new QueryClient();
 
 import { useInsightStore } from '../store/insightStore';
 import { supabase } from '../lib/supabase';
+import {
+  registerForPushNotifications,
+  setupNotificationResponseListener,
+  getInitialNotificationRoute,
+} from '../lib/notifications';
 
 function AuthGuard() {
   const { session, isLoading, initialize } = useAuthStore();
@@ -99,6 +104,28 @@ function AuthGuard() {
       { id, name: fullName, email: email ?? '' },
       { onConflict: 'id' }
     );
+  }, [session?.user?.id]);
+
+  // ── Push notification registration + tap listeners ───────────────────
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const { notificationsEnabled } = useSettingsStore.getState();
+    if (notificationsEnabled) {
+      registerForPushNotifications(session.user.id);
+    }
+
+    // Deep-link when user taps a notification while app is running
+    const cleanup = setupNotificationResponseListener((route) => {
+      router.push(route as any);
+    });
+
+    // Handle cold-start: app opened via notification tap
+    getInitialNotificationRoute().then((route) => {
+      if (route) setTimeout(() => router.push(route as any), 500);
+    });
+
+    return cleanup;
   }, [session?.user?.id]);
 
   // Block rendering until we know the auth state.
