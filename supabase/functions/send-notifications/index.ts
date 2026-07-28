@@ -32,6 +32,29 @@ async function sendPush(messages: object[]) {
   return data;
 }
 
+/** Record in-app notification history entry. */
+async function recordNotification(
+  sb: any,
+  userId: string,
+  title: string,
+  body: string,
+  type: string,
+  screen?: string,
+) {
+  try {
+    await sb.from('notifications').insert({
+      user_id: userId,
+      title,
+      body,
+      type,
+      screen,
+      is_read: false,
+    });
+  } catch (err: any) {
+    console.error('Failed to record notification history:', err.message);
+  }
+}
+
 /** Get all push tokens for a single user. */
 async function tokensFor(sb: any, userId: string): Promise<string[]> {
   const { data } = await sb.from('push_tokens').select('token').eq('user_id', userId);

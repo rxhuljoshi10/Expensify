@@ -21,6 +21,8 @@ import { useFamilyGroup } from '../../hooks/useFamilyGroup';
 import { useDashboardStore } from '../../store/dashboardStore';
 import MemberSpendingBar from '../../components/MemberSpendingBar';
 import { useRecurring } from '../../hooks/useRecurring';
+import { useNotifications } from '../../hooks/useNotifications';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -32,6 +34,7 @@ export default function HomeScreen() {
   const { data: group } = useFamilyGroup();
   const { viewMode, setViewMode } = useDashboardStore();
   const { data: recurring = [] } = useRecurring();
+  const { unreadCount } = useNotifications();
 
   useEffect(() => {
     if (!group && viewMode === 'group') {
@@ -63,6 +66,7 @@ export default function HomeScreen() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['expenses'] }),
       queryClient.invalidateQueries({ queryKey: ['group-expenses'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
     ]);
     setRefreshing(false);
   };
@@ -93,6 +97,19 @@ export default function HomeScreen() {
               {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => router.push('/notifications')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="notifications-outline" size={24} color={theme.text} />
+            {unreadCount > 0 && (
+              <View style={[styles.bellBadge, { backgroundColor: theme.primary }]}>
+                <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         <InsightCard />
@@ -157,6 +174,28 @@ function createStyles(theme: Theme) {
     greetingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 8 },
     greeting: { fontSize: 22, fontWeight: '700', color: theme.text },
     date: { fontSize: 13, color: theme.textSecondary, marginTop: 4 },
+    bellButton: {
+      position: 'relative',
+      padding: 8,
+      borderRadius: 12,
+      backgroundColor: theme.separator,
+    },
+    bellBadge: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      borderRadius: 8,
+      minWidth: 16,
+      height: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+    },
+    bellBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '700',
+    },
     statsRow: { flexDirection: 'row', marginBottom: 20, marginHorizontal: -4 },
     viewToggle: {
       flexDirection: 'row', backgroundColor: theme.separator,
