@@ -97,3 +97,32 @@ export interface CreateRecurringInput {
   frequency: RecurringFrequency;
   next_due_date: string;
 }
+
+// ── SMS Auto-Expense types ───────────────────────────────────────────
+
+export type VpaType = 'personal' | 'dynamic_qr' | 'brand';
+export type PendingStatus = 'pending' | 'processed' | 'expired';
+
+export interface PendingSmsExpense {
+  id: string;
+  user_id: string;
+  raw_sms: string;
+  amount: number;       // in paise
+  raw_vpa: string | null;
+  vpa_type: VpaType;
+  parsed_date: string | null;
+  status: PendingStatus;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface MerchantMapping {
+  id: string;
+  user_id: string;
+  raw_vpa: string;
+  friendly_name: string;
+  category: string | null;
+  use_count: number;
+  created_at: string;
+  updated_at: string;
+}

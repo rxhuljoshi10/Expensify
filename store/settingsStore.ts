@@ -39,9 +39,11 @@ interface SettingsState {
     theme: 'light' | 'dark';
     notificationsEnabled: boolean;
     notificationPreferences: NotificationPreferences;
+    smsSyncEnabled: boolean;
     toggleTheme: () => void;
     setNotificationsEnabled: (enabled: boolean) => void;
     updateNotificationPreferences: (prefs: Partial<NotificationPreferences>) => void;
+    setSmsSyncEnabled: (enabled: boolean) => void;
     loadSettings: () => Promise<void>;
 }
 
@@ -49,6 +51,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     theme: 'dark',
     notificationsEnabled: true,
     notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFS },
+    smsSyncEnabled: false,
 
     toggleTheme: () => {
         const next = get().theme === 'dark' ? 'light' : 'dark';
@@ -67,6 +70,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         persist(get());
     },
 
+    setSmsSyncEnabled: (enabled) => {
+        set({ smsSyncEnabled: enabled });
+        persist(get());
+    },
+
     loadSettings: async () => {
         try {
             const raw = await AsyncStorage.getItem(SETTINGS_KEY);
@@ -79,6 +87,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                         ...DEFAULT_NOTIFICATION_PREFS,
                         ...(parsed.notificationPreferences ?? {}),
                     },
+                    smsSyncEnabled: parsed.smsSyncEnabled ?? false,
                 });
             }
         } catch (e) {
@@ -94,6 +103,7 @@ function persist(state: SettingsState) {
             theme: state.theme,
             notificationsEnabled: state.notificationsEnabled,
             notificationPreferences: state.notificationPreferences,
+            smsSyncEnabled: state.smsSyncEnabled,
         }),
     );
 }

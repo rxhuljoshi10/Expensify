@@ -23,6 +23,7 @@ import {
   setupNotificationResponseListener,
   getInitialNotificationRoute,
 } from '../lib/notifications';
+import { useSmsSync } from '../hooks/useSmsSync';
 
 function AuthGuard() {
   const { session, isLoading, initialize } = useAuthStore();
@@ -31,6 +32,9 @@ function AuthGuard() {
   const router = useRouter();
   const theme = useTheme();
   const { triggerGeneration, isGenerating } = useInsightStore();
+
+  // ── SMS Auto-Sync listener (Android only) ──────────────────────────
+  useSmsSync();
 
   useEffect(() => {
     loadSettings();

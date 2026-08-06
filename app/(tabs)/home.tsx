@@ -22,12 +22,17 @@ import { useDashboardStore } from '../../store/dashboardStore';
 import MemberSpendingBar from '../../components/MemberSpendingBar';
 import { useRecurring } from '../../hooks/useRecurring';
 import { useNotifications } from '../../hooks/useNotifications';
+import { usePendingExpenses } from '../../hooks/usePendingExpenses';
+import PendingExpensesBanner from '../../components/PendingExpensesBanner';
+import { toast } from '../../lib/toast';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 
 export default function HomeScreen() {
   const theme = useTheme();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const isFocused = useIsFocused();
   const [period, setPeriod] = useState<Period>('today');
   const [refreshing, setRefreshing] = useState(false);
   const { data: budget } = useBudget();
@@ -35,12 +40,23 @@ export default function HomeScreen() {
   const { viewMode, setViewMode } = useDashboardStore();
   const { data: recurring = [] } = useRecurring();
   const { unreadCount } = useNotifications();
+  const { data: pendingExpenses = [] } = usePendingExpenses();
+  const pendingCount = pendingExpenses.length;
 
   useEffect(() => {
     if (!group && viewMode === 'group') {
       setViewMode('personal');
     }
   }, [group, viewMode, setViewMode]);
+
+  // Subtle toast nudge after 10 seconds if pending expenses exist
+  useEffect(() => {
+    if (pendingCount <= 0 || !isFocused) return;
+    const timer = setTimeout(() => {
+      toast.info(`📱 You have ${pendingCount} pending expense${pendingCount > 1 ? 's' : ''} to review`);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [pendingCount, isFocused]);
 
   const dueTodayCount = recurring.filter(r => {
     return r.is_active && r.next_due_date === getLocalISODate();
@@ -113,6 +129,9 @@ export default function HomeScreen() {
         </View>
 
         <InsightCard />
+
+        {/* Pending SMS expenses banner */}
+        <PendingExpensesBanner count={pendingCount} />
 
         {group && (
           <View style={styles.viewToggle}>

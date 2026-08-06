@@ -49,7 +49,7 @@ export default function NotificationSettingsScreen() {
   const { user } = useAuthStore();
   const { data: group } = useFamilyGroup();
 
-  const { notificationsEnabled, setNotificationsEnabled } = useSettingsStore();
+  const { notificationsEnabled, setNotificationsEnabled, smsSyncEnabled, setSmsSyncEnabled } = useSettingsStore();
   const { data: serverPrefs } = useNotificationPreferences();
   const { mutate: savePrefs } = useSaveNotificationPreferences();
 
@@ -152,6 +152,39 @@ export default function NotificationSettingsScreen() {
             />
           </View>
         </View>
+
+        {/* ── SMS Auto-Sync (Android only) ── */}
+        {Platform.OS === 'android' && (
+          <>
+            <Text style={styles.sectionHeader}>SMS Auto-Sync</Text>
+            <View style={styles.card}>
+              <View style={styles.row}>
+                <View style={[styles.rowIcon, { backgroundColor: '#6C5CE722' }]}>
+                  <Ionicons name="phone-portrait-outline" size={17} color="#6C5CE7" />
+                </View>
+                <View style={styles.rowContent}>
+                  <Text style={styles.rowLabel}>Auto-detect SMS Expenses</Text>
+                  <Text style={styles.rowDesc}>
+                    Automatically detect and save expenses from bank transaction SMS
+                  </Text>
+                </View>
+                <Switch
+                  value={smsSyncEnabled}
+                  onValueChange={(v) => {
+                    setSmsSyncEnabled(v);
+                    if (v) {
+                      toast.success('SMS Auto-Sync enabled');
+                    } else {
+                      toast.success('SMS Auto-Sync disabled');
+                    }
+                  }}
+                  trackColor={{ false: theme.border, true: '#6C5CE7' }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+          </>
+        )}
 
         {/* ── Everything below fades when master is off ── */}
         <View

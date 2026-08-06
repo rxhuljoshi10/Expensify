@@ -23,6 +23,7 @@ const ROUTE_MAP: Record<string, string> = {
   recurring: '/recurring',
   'budget-settings': '/budget-settings',
   'notification-settings': '/notification-settings',
+  'pending-expenses': '/pending-expenses',
   profile: '/(tabs)/profile',
 };
 

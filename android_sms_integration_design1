@@ -1,0 +1,139 @@
+# Design Specification: Android SMS Transaction Auto-Sync (Refined)
+
+This document specifies the refined architecture and logic to automatically detect, parse, and log expenses from transaction SMS messages on Android.
+
+---
+
+## 1. Flow Overview & SMS Trigger
+
+1. **Background Monitoring:** The Android application runs a background `BroadcastReceiver` listening for `android.provider.Telephony.SMS_RECEIVED`.
+2. **Initial Filter:** The local code checks for transaction indicators (e.g., matching keywords like `Sent`, `Debited`, `Paid`, `Charged`, `Rs.`, `$`).
+3. **Data Extraction:** If matched, the SMS body is sent to a local parser or a Supabase Edge Function to extract:
+   * **Amount** (e.g., `30.00`)
+   * **Date & Time** of receipt (e.g., `2026-07-25 17:56:00`)
+   * **Location Coordinates** (cached at the exact moment the SMS is received, if location permission is granted)
+   * **Recipient VPA / UPI ID** (e.g., `paytmqr6h6pev@ptys` or `swiggy@icici`)
+
+---
+
+## 2. VPA Categorization & Logic Matrix
+
+When a VPA is extracted, the VPA handle (before the `@`) and the bank/provider (after the `@`) are split to determine the categorization path:
+
+```mermaid
+graph TD
+    A[Extracted VPA] --> B(Split VPA: handle@provider)
+    
+    B --> C{Is Personal/P2P?}
+    C -->|Yes: Provider starts with 'ok' OR Handle is 10-digit number| D[Auto-save as 'Personal']
+    
+    C -->|No| E{Is Dynamic QR / Unrecognizable?}
+    E -->|Yes: Handle contains 'qr' OR is alphanumeric hash| F[Check merchant_mappings table]
+    
+    F -->|Found mapping| G[Save with mapped Name & Category]
+    F -->|Not found| H[Create PENDING Expense & Send Notification]
+    
+    E -->|No: Other handles e.g., swiggy@icici| I[Run Gemini Auto-Categorize]
+    I --> J[Save automatically as Known Brand]
+```
+
+### Detailed Rules:
+
+| VPA Type | Rules / Patterns | Resolution Path | Target Category |
+| :--- | :--- | :--- | :--- |
+| **Personal / P2P** | 1. Provider starts with `ok` (e.g., `oksbi`, `okaxis`, `okicici`).<br>2. Handle is exactly 10 numeric digits (e.g., `9876543210@paytm`). | Save immediately. | **Personal** |
+| **Dynamic QR (Unrecognizable)** | Handle contains `qr` (e.g., `paytmqr...`) or is an alphanumeric hash (e.g., `paytmqr63o@ptys`). | **1. Check `merchant_mappings`:** If mapped in past, fetch friendly name & category.<br>**2. If Unmapped:** Notify user for quick input $\rightarrow$ If no input, save as **Pending**. | *Mapped Category* / **Pending** |
+| **Known Brand / Named VPA** | Any other structured handle (e.g., `swiggy@icici`, `uber@icici`, `netflix@hdfc`). | Run Gemini OCR/Text parser $\rightarrow$ Save immediately. | **Auto-categorized** (e.g., Food, Transport) |
+
+---
+
+## 3. Interactive Notification & Quick-Action Design
+
+Every automatic save triggers a push notification. For **Pending / Unrecognizable QR** transactions, we offer inline actions:
+
+```
++-------------------------------------------------------------+
+| 💳 Expensify                                                 |
+| Spent Rs. 30.00 via Paytm QR                                |
+| We added Rs. 30.00 spent near Sector 62. Name this shop?    |
+|                                                             |
+|  [ Type shop name...               ]  [Confirm]   [Edit]   |
++-------------------------------------------------------------+
+```
+
+* **Inline Text Input (Android RemoteInput):** The user can type `"Raju Tea Stall"` directly in the notification reply box and tap **Confirm**.
+  * **Result:** The service intercepts the reply, updates the expense to `"Raju Tea Stall"`, sets the category to `Food` (auto-categorized via LLM based on name), and writes the mapping `paytmqr6h6pev@ptys -> Raju Tea Stall` to `merchant_mappings`.
+* **No Response:** If the user swipes away or does not interact, the expense is flagged as **Pending**.
+
+---
+
+## 4. Pending Expenses Lifecycle (The 24h Auto-Resolution)
+
+To prevent the user's dashboard from falling out of sync due to unconfirmed expenses, we implement an automatic cleanup lifecycle:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending : SMS Received (Unmapped VPA)
+    Pending --> UserConfirmed : User names merchant via notification or UI (Any time)
+    UserConfirmed --> Saved : Saved to database
+    
+    Pending --> SystemResolved : 24 Hours Pass without interaction
+    SystemResolved --> Saved : Saved as "Raw VPA" under category "Other" (with 'unprocessed' flag)
+```
+
+* **The 24-Hour Timer:** A daily background job finds any `pending` expenses older than 24 hours.
+* **Resolution:** It updates the merchant name to the raw VPA handle (e.g., `paytmqr6h6pev`) and changes the category to `Other` / `Unknown`.
+* **Traceability:** It keeps a flag `is_unprocessed: true`. If the user views their expense list later, these items are highlighted so they can still clean them up manually.
+
+---
+
+## 5. UI Design for Pending Expenses
+
+When there are pending transactions (under 24 hours old), the app guides the user to process them cleanly:
+
+### 1. Home Screen Badge & Trigger
+* A subtle but visible widget on the Home Page displays: `"You have 3 unprocessed transactions"`.
+* Clicking this opens the **Quick Processing Carousel**.
+
+### 2. Contextual Aids (Location & Time)
+To jog the user's memory, cards are decorated with context:
+* **Time:** *"Today at 2:14 PM"* or *"Yesterday at 8:30 AM"*.
+* **Geographic Tags:** If coordinates were captured at the time the SMS was received, the app performs a local reverse-geocode lookup to display: *"Spent near Sector 62, Noida"* or *"Spent near Central Park"*.
+
+### 3. Quick-Processing Modal
+A sequential flashcard interface:
+```
++-----------------------------------------------------+
+|                  PENDING TRANSACTIONS               |
+|                                                     |
+|  [ Card 1 of 3 ]                                    |
+|  Amount: Rs. 30.00                                  |
+|  Time: Today, 2:14 PM                               |
+|  Location: Near Sector 62, Noida                    |
+|                                                     |
+|  Who did you pay?                                   |
+|  [ Raju Tea Stall                     ]             |
+|                                                     |
+|  Category:                                          |
+|  ( ) Food    ( ) Transport    ( ) Shopping    (...) |
+|                                                     |
+|               [ SAVE ]      [ SKIP ]                |
++-----------------------------------------------------+
+```
+
+### 4. The 10-Second Auto-Popup Rule
+* If the user opens the app and has pending items, we wait **10 seconds** of activity/idle on the home screen.
+* If they don't click the banner, the Quick-Processing Modal automatically slides up to capture their feedback.
+* **Frequency Limit:** This popup should only occur once per app session to avoid annoying the user if they actively dismiss it.
+
+### 5. Daily Inactive Reminders
+* At the end of the day (e.g., 9:00 PM), the app checks if there are unprocessed transactions and sends a single summary notification: *"You have 3 transactions from today that need categorizing. Tap to finish your daily budget."*
+
+---
+
+## 6. Technical Feasibility Check
+
+* **Background Location:** Accessing location at the exact time of `SMS_RECEIVED` requires `ACCESS_BACKGROUND_LOCATION` permission. This is heavily restricted on the Google Play Store. 
+  * *Alternative:* We can fall back to the last-known coarse location to avoid requesting high-risk background location permissions.
+* **Notification Input:** Yes, Expo / React Native supports Android notification actions with text input fields using libraries like `notifee` or custom Expo modules.
+* **Local Processing:** Storing the pending items in SQLite or AsyncStorage and sync-scheduling via React Native `WorkManager` or custom Expo tasks is fully supported.
