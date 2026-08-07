@@ -51,7 +51,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     theme: 'dark',
     notificationsEnabled: true,
     notificationPreferences: { ...DEFAULT_NOTIFICATION_PREFS },
-    smsSyncEnabled: false,
+    smsSyncEnabled: true,
 
     toggleTheme: () => {
         const next = get().theme === 'dark' ? 'light' : 'dark';
@@ -87,7 +87,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
                         ...DEFAULT_NOTIFICATION_PREFS,
                         ...(parsed.notificationPreferences ?? {}),
                     },
-                    smsSyncEnabled: parsed.smsSyncEnabled ?? false,
+                    smsSyncEnabled: parsed.smsSyncEnabled ?? true,
                 });
             }
         } catch (e) {

@@ -1,24 +1,25 @@
 // hooks/useSmsSync.ts
-// Main hook that connects the native SMS BroadcastReceiver to the
-// smsSync orchestrator. Activated in _layout.tsx when user is logged in.
+// Manages SMS sync lifecycle: permissions, offline queue, expense expiry,
+// realtime DB updates, and AppState focus refetching.
+// Actual SMS processing is handled by HeadlessJS (SmsHeadlessTask in index.ts).
 
 import { useEffect, useRef } from 'react';
-import { NativeModules, NativeEventEmitter, Platform, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, AppState, AppStateStatus } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import { focusManager, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useUserCategories } from './useUserCategories';
-import { processSms, processOfflineQueue, expirePendingExpenses } from '../lib/smsSync';
-import { useQueryClient } from '@tanstack/react-query';
-
-const { SmsReceiverModule } = NativeModules;
+import { processOfflineQueue, expirePendingExpenses } from '../lib/smsSync';
+import { supabase } from '../lib/supabase';
 
 /**
- * Hook that manages the SMS sync lifecycle:
- * 1. Listens for incoming SMS via native BroadcastReceiver
- * 2. Processes each SMS through the sync pipeline
- * 3. Handles offline queue processing on connectivity restore
- * 4. Expires old pending expenses on mount
+ * Hook that manages the SMS sync lifecycle & UI synchronization:
+ * 1. Requests SMS permissions on mount
+ * 2. Realtime listener for `expenses` and `pending_sms_expenses` DB changes
+ * 3. AppState change listener (refetches queries when app returns to foreground)
+ * 4. Offline queue processing on connectivity restore
+ * 5. Expire old pending expenses on mount
  */
 export function useSmsSync(): void {
   const { user } = useAuthStore();
@@ -30,16 +31,13 @@ export function useSmsSync(): void {
   const userId = user?.id;
   const categoryNames = categories?.map(c => c.name);
 
-  // ── SMS Listener ───────────────────────────────────────────────────
+  // ── 1. Request SMS Permissions ───────────────────────────────────────
   useEffect(() => {
-    if (Platform.OS !== 'android' || !userId || !smsSyncEnabled) return;
+    if (Platform.OS !== 'android') return;
+    if (!userId || !smsSyncEnabled) return;
 
-    let eventEmitter: NativeEventEmitter | null = null;
-    let subscription: any = null;
-
-    const setup = async () => {
+    const requestPermissions = async () => {
       try {
-        // Request permissions if not already granted
         const granted = await PermissionsAndroid.requestMultiple([
           PermissionsAndroid.PERMISSIONS.READ_SMS,
           PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
@@ -49,44 +47,81 @@ export function useSmsSync(): void {
           granted['android.permission.READ_SMS'] === PermissionsAndroid.RESULTS.GRANTED &&
           granted['android.permission.RECEIVE_SMS'] === PermissionsAndroid.RESULTS.GRANTED;
 
-        if (!hasPermissions) {
+        if (hasPermissions) {
+          console.log('[useSmsSync] SMS permissions granted — HeadlessJS will process incoming SMS');
+        } else {
           console.log('[useSmsSync] SMS permissions not granted');
-          return;
         }
-
-        // Start native listener
-        await SmsReceiverModule.startListening();
-
-        // Subscribe to SMS events
-        eventEmitter = new NativeEventEmitter(SmsReceiverModule);
-        subscription = eventEmitter.addListener(
-          'onSmsReceived',
-          async (event: { sender: string; body: string; timestamp: number }) => {
-            console.log('[useSmsSync] SMS received from:', event.sender);
-            await processSms(event.body, userId, categoryNames);
-            // Invalidate expense queries so UI updates
-            queryClient.invalidateQueries({ queryKey: ['expenses'] });
-            queryClient.invalidateQueries({ queryKey: ['pending-sms-expenses'] });
-          },
-        );
-
-        console.log('[useSmsSync] SMS listener active');
       } catch (e) {
-        console.error('[useSmsSync] Setup failed:', e);
+        console.error('[useSmsSync] Permission request failed:', e);
       }
     };
 
-    setup();
+    requestPermissions();
+  }, [userId, smsSyncEnabled]);
+
+  // ── 2. Realtime DB Listener for Personal & Pending Expenses ──────────
+  useEffect(() => {
+    if (!userId) return;
+
+    console.log('[useSmsSync] Subscribing to realtime updates for user:', userId);
+
+    const channel = supabase
+      .channel(`personal-expenses-sync-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('[useSmsSync] Realtime DB event (expenses):', payload.eventType);
+          queryClient.invalidateQueries({ queryKey: ['expenses'] });
+          queryClient.invalidateQueries({ queryKey: ['group-expenses'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pending_sms_expenses',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('[useSmsSync] Realtime DB event (pending_sms_expenses):', payload.eventType);
+          queryClient.invalidateQueries({ queryKey: ['pending-sms-expenses'] });
+        }
+      )
+      .subscribe();
 
     return () => {
-      subscription?.remove();
-      if (SmsReceiverModule?.stopListening) {
-        SmsReceiverModule.stopListening().catch(() => {});
+      supabase.removeChannel(channel);
+    };
+  }, [userId, queryClient]);
+
+  // ── 3. AppState Change Listener (Foreground return refetch) ─────────
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (Platform.OS !== 'web') {
+        focusManager.setFocused(nextAppState === 'active');
+      }
+
+      if (nextAppState === 'active' && userId) {
+        console.log('[useSmsSync] App returned to foreground — invalidating expense queries');
+        queryClient.invalidateQueries({ queryKey: ['expenses'] });
+        queryClient.invalidateQueries({ queryKey: ['pending-sms-expenses'] });
+        queryClient.invalidateQueries({ queryKey: ['group-expenses'] });
       }
     };
-  }, [userId, smsSyncEnabled, categoryNames?.join(',')]);
 
-  // ── Offline Queue Processing ───────────────────────────────────────
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [userId, queryClient]);
+
+  // ── 4. Offline Queue Processing ───────────────────────────────────────
   useEffect(() => {
     if (Platform.OS !== 'android' || !userId || !smsSyncEnabled) return;
 
@@ -101,9 +136,9 @@ export function useSmsSync(): void {
     });
 
     return () => unsubscribe();
-  }, [userId, smsSyncEnabled, categoryNames?.join(',')]);
+  }, [userId, smsSyncEnabled]);
 
-  // ── Expire Old Pending Expenses (on mount) ─────────────────────────
+  // ── 5. Expire Old Pending Expenses (on mount) ─────────────────────────
   useEffect(() => {
     if (!userId) return;
 

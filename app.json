@@ -9,9 +9,9 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splashscreen.png",
-      "resizeMode": "cover",
-      "backgroundColor": "#321448"
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#03C775"
     },
     "ios": {
       "supportsTablet": true,
@@ -38,9 +38,10 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.png"
     },
     "plugins": [
+      "./plugins/withSmsReceiver",
       "expo-router",
       "expo-secure-store",
       "@react-native-community/datetimepicker",
@@ -60,7 +61,15 @@
         }
       ],
       "expo-web-browser",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#03C775",
+          "image": "./assets/icon.png",
+          "imageWidth": 200
+        }
+      ]
     ],
     "extra": {
       "router": {},

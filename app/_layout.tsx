@@ -25,6 +25,8 @@ import {
 } from '../lib/notifications';
 import { useSmsSync } from '../hooks/useSmsSync';
 
+import AnimatedSplashScreen from '../components/AnimatedSplashScreen';
+
 function AuthGuard() {
   const { session, isLoading, initialize } = useAuthStore();
   const { loadSettings } = useSettingsStore();
@@ -95,14 +97,11 @@ function AuthGuard() {
   }, [session, isLoading, segments]);
 
   // ── Sync user profile to public.users on every app open ──────────────
-  // Many users completed onboarding before the public.users write was added,
-  // so their name lives only in auth metadata. This upsert fixes that silently
-  // and ensures group members always see the real name (not email / "Admin").
   useEffect(() => {
     if (!session?.user) return;
     const { id, email, user_metadata } = session.user;
     const fullName = user_metadata?.full_name;
-    if (!fullName) return; // No name yet — user will be sent to onboarding
+    if (!fullName) return;
 
     supabase.from('users').upsert(
       { id, name: fullName, email: email ?? '' },
@@ -119,27 +118,16 @@ function AuthGuard() {
       registerForPushNotifications(session.user.id);
     }
 
-    // Deep-link when user taps a notification while app is running
     const cleanup = setupNotificationResponseListener((route) => {
       router.push(route as any);
     });
 
-    // Handle cold-start: app opened via notification tap
     getInitialNotificationRoute().then((route) => {
       if (route) setTimeout(() => router.push(route as any), 500);
     });
 
     return cleanup;
   }, [session?.user?.id]);
-
-  // Block rendering until we know the auth state.
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background }}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
 
   return (
     <Stack
