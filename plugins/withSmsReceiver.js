@@ -15,7 +15,12 @@ const fs = require('fs');
 
 const SMS_HEADLESS_TASK_SERVICE_KT = `package com.rxhuljoshi.expensify
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
+import android.os.Build
+import android.util.Log
+import androidx.core.app.NotificationCompat
 import com.facebook.react.HeadlessJsTaskService
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
@@ -23,8 +28,36 @@ import com.facebook.react.jstasks.HeadlessJsTaskConfig
 /**
  * Service that launches the React Native JS context in the background
  * to execute 'SmsHeadlessTask' when an SMS arrives while the app is closed or minimized.
+ *
+ * On Android O+ this service is started via startForegroundService(), so we MUST
+ * call startForeground() within 5 seconds. We show a minimal, transient notification
+ * that auto-dismisses when the task completes.
  */
 class SmsHeadlessTaskService : HeadlessJsTaskService() {
+
+    companion object {
+        private const val CHANNEL_ID = "sms_processing_channel"
+        private const val NOTIFICATION_ID = 9999
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Must call startForeground IMMEDIATELY — before super, to satisfy the 5s deadline
+        createNotificationChannel()
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Processing SMS")
+            .setContentText("Checking for expense transactions…")
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+
+        startForeground(NOTIFICATION_ID, notification)
+        Log.d("ExpensifySMS", "SmsHeadlessTaskService: startForeground called")
+
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig? {
         val extras = intent?.extras ?: return null
         return HeadlessJsTaskConfig(
@@ -34,6 +67,28 @@ class SmsHeadlessTaskService : HeadlessJsTaskService() {
             true   // allow in foreground as well
         )
     }
+
+    override fun onHeadlessJsTaskFinish(taskId: Int) {
+        super.onHeadlessJsTaskFinish(taskId)
+        Log.d("ExpensifySMS", "SmsHeadlessTaskService: task finished, stopping foreground")
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "SMS Processing",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shows while processing incoming SMS for expenses"
+                setShowBadge(false)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(channel)
+        }
+    }
 }
 `;
 
@@ -42,6 +97,7 @@ const SMS_RECEIVER_KT = `package com.rxhuljoshi.expensify
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Telephony
 import android.util.Log
 import com.facebook.react.HeadlessJsTaskService
@@ -52,8 +108,10 @@ import com.facebook.react.HeadlessJsTaskService
  *
  * ALL SMS messages are processed via HeadlessJS (SmsHeadlessTaskService),
  * regardless of whether the app is in the foreground, background, or killed.
- * This eliminates the race condition where the foreground EventEmitter path
- * would silently drop SMS when the React instance isn't fully active.
+ *
+ * On Android O+ we MUST use startForegroundService() because background apps
+ * are not allowed to call startService(). The SmsHeadlessTaskService will
+ * immediately call startForeground() to satisfy the 5-second deadline.
  */
 class SmsReceiver : BroadcastReceiver() {
 
@@ -85,7 +143,11 @@ class SmsReceiver : BroadcastReceiver() {
                     putExtra("timestamp", timestamp.toDouble())
                 }
                 HeadlessJsTaskService.acquireWakeLockNow(context)
-                context.startService(serviceIntent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
             } catch (e: Exception) {
                 Log.e("ExpensifySMS", "Failed to launch HeadlessJS service", e)
             }
@@ -201,13 +263,34 @@ function withSmsMainApplication(config) {
 }
 
 /**
- * Step 3: Add <receiver> and <service> declarations to AndroidManifest.xml.
+ * Step 3: Add <receiver>, <service> declarations, and permissions to AndroidManifest.xml.
  */
 function withSmsManifest(config) {
   return withAndroidManifest(config, (config) => {
-    const application = config.modResults.manifest.application[0];
+    const manifest = config.modResults.manifest;
+    const application = manifest.application[0];
 
-    // Receiver registration
+    // ── Add permissions ──────────────────────────────────────────────────
+    const existingPermissions = (manifest['uses-permission'] || []).map(
+      (p) => p.$?.['android:name'],
+    );
+
+    const requiredPermissions = [
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_SHORT_SERVICE',
+      'android.permission.WAKE_LOCK',
+    ];
+
+    for (const perm of requiredPermissions) {
+      if (!existingPermissions.includes(perm)) {
+        manifest['uses-permission'] = manifest['uses-permission'] || [];
+        manifest['uses-permission'].push({
+          $: { 'android:name': perm },
+        });
+      }
+    }
+
+    // ── Receiver registration ────────────────────────────────────────────
     const receivers = application.receiver || [];
     const receiverDeclared = receivers.some(
       (r) => r.$?.['android:name'] === '.SmsReceiver',
@@ -234,7 +317,7 @@ function withSmsManifest(config) {
       ];
     }
 
-    // HeadlessJS Service registration
+    // ── HeadlessJS Service registration ──────────────────────────────────
     const services = application.service || [];
     const serviceDeclared = services.some(
       (s) => s.$?.['android:name'] === '.SmsHeadlessTaskService',
@@ -247,9 +330,18 @@ function withSmsManifest(config) {
           $: {
             'android:name': '.SmsHeadlessTaskService',
             'android:exported': 'false',
+            'android:foregroundServiceType': 'shortService',
           },
         },
       ];
+    } else {
+      // Update existing service declaration to include foregroundServiceType
+      const existingService = services.find(
+        (s) => s.$?.['android:name'] === '.SmsHeadlessTaskService',
+      );
+      if (existingService && !existingService.$['android:foregroundServiceType']) {
+        existingService.$['android:foregroundServiceType'] = 'shortService';
+      }
     }
 
     return config;
