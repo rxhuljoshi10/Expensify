@@ -48,7 +48,7 @@ export function useSmsSync(): void {
           granted['android.permission.RECEIVE_SMS'] === PermissionsAndroid.RESULTS.GRANTED;
 
         if (hasPermissions) {
-          console.log('[useSmsSync] SMS permissions granted — HeadlessJS will process incoming SMS');
+          console.log('[useSmsSync] SMS permissions granted');
         } else {
           console.log('[useSmsSync] SMS permissions not granted');
         }
@@ -58,6 +58,33 @@ export function useSmsSync(): void {
     };
 
     requestPermissions();
+  }, [userId, smsSyncEnabled]);
+
+  // ── Sync Auth Token to Native SharedPreferences for Background Execution ──
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !userId) return;
+
+    const syncNativeAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          const { NativeModules } = require('react-native');
+          if (NativeModules.SmsReceiverModule?.saveAuthToken) {
+            await NativeModules.SmsReceiverModule.saveAuthToken(userId, token);
+            console.log('[useSmsSync] Synced auth token to native SharedPreferences');
+          }
+          if (smsSyncEnabled && NativeModules.SmsReceiverModule?.startForegroundService) {
+            await NativeModules.SmsReceiverModule.startForegroundService();
+            console.log('[useSmsSync] Started native SMS foreground service');
+          }
+        }
+      } catch (e) {
+        console.error('[useSmsSync] Failed to sync auth to native:', e);
+      }
+    };
+
+    syncNativeAuth();
   }, [userId, smsSyncEnabled]);
 
   // ── 2. Realtime DB Listener for Personal & Pending Expenses ──────────
