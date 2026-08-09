@@ -123,6 +123,7 @@ import java.util.Locale
 
 /**
  * Native SMS processor that handles expense detection entirely in Kotlin.
+ * Includes automatic Supabase JWT Token Refresh on HTTP 401 Unauthorized.
  */
 object NativeSmsProcessor {
 
@@ -192,8 +193,8 @@ object NativeSmsProcessor {
 
             if (fields.vpa == null) {
                 val saved = saveExpenseToSupabase(
-                    userId = session.userId,
-                    accessToken = session.accessToken,
+                    context = context,
+                    session = session,
                     amount = amountPaise,
                     merchant = "Unknown Merchant",
                     category = "Other",
@@ -216,8 +217,8 @@ object NativeSmsProcessor {
                 "personal" -> {
                     val displayName = formatMerchantFromVpa(classification.handle, "personal")
                     val saved = saveExpenseToSupabase(
-                        userId = session.userId,
-                        accessToken = session.accessToken,
+                        context = context,
+                        session = session,
                         amount = amountPaise,
                         merchant = displayName,
                         category = "Personal",
@@ -236,8 +237,8 @@ object NativeSmsProcessor {
                 "brand" -> {
                     val displayName = formatMerchantFromVpa(classification.handle, "brand")
                     val saved = saveExpenseToSupabase(
-                        userId = session.userId,
-                        accessToken = session.accessToken,
+                        context = context,
+                        session = session,
                         amount = amountPaise,
                         merchant = displayName,
                         category = "Other",
@@ -255,15 +256,15 @@ object NativeSmsProcessor {
 
                 "dynamic_qr" -> {
                     val mapping = lookupMerchantMapping(
-                        userId = session.userId,
-                        accessToken = session.accessToken,
+                        context = context,
+                        session = session,
                         rawVpa = classification.raw
                     )
 
                     if (mapping != null) {
                         val saved = saveExpenseToSupabase(
-                            userId = session.userId,
-                            accessToken = session.accessToken,
+                            context = context,
+                            session = session,
                             amount = amountPaise,
                             merchant = mapping.friendlyName,
                             category = mapping.category,
@@ -279,8 +280,8 @@ object NativeSmsProcessor {
                         }
                     } else {
                         val savedPending = savePendingExpenseToSupabase(
-                            userId = session.userId,
-                            accessToken = session.accessToken,
+                            context = context,
+                            session = session,
                             rawSms = smsBody,
                             amount = amountPaise,
                             rawVpa = classification.raw,
@@ -437,7 +438,8 @@ object NativeSmsProcessor {
 
     data class UserSession(
         val userId: String,
-        val accessToken: String
+        var accessToken: String,
+        var refreshToken: String
     )
 
     private fun getUserSession(context: Context): UserSession? {
@@ -445,8 +447,9 @@ object NativeSmsProcessor {
             val authPrefs = context.getSharedPreferences(AUTH_PREFS, Context.MODE_PRIVATE)
             val userId = authPrefs.getString("user_id", null)
             val token = authPrefs.getString("access_token", null)
+            val refreshToken = authPrefs.getString("refresh_token", "") ?: ""
             if (!userId.isNullOrEmpty() && !token.isNullOrEmpty()) {
-                return UserSession(userId, token)
+                return UserSession(userId, token, refreshToken)
             }
         } catch (_: Exception) {}
 
@@ -489,23 +492,79 @@ object NativeSmsProcessor {
             val currentSession = json.optJSONObject("currentSession")
             if (currentSession != null) {
                 val token = currentSession.optString("access_token", "")
+                val refreshToken = currentSession.optString("refresh_token", "")
                 val user = currentSession.optJSONObject("user")
                 val userId = user?.optString("id", "") ?: ""
                 if (token.isNotEmpty() && userId.isNotEmpty()) {
-                    return UserSession(userId, token)
+                    return UserSession(userId, token, refreshToken)
                 }
             }
         } catch (_: Exception) {}
 
         try {
             val token = json.optString("access_token", "")
+            val refreshToken = json.optString("refresh_token", "")
             val user = json.optJSONObject("user")
             val userId = user?.optString("id", "") ?: ""
             if (token.isNotEmpty() && userId.isNotEmpty()) {
-                return UserSession(userId, token)
+                return UserSession(userId, token, refreshToken)
             }
         } catch (_: Exception) {}
 
+        return null
+    }
+
+    private fun refreshSupabaseToken(context: Context, session: UserSession): UserSession? {
+        if (session.refreshToken.isEmpty()) return null
+
+        try {
+            val url = URL("$SUPABASE_URL/auth/v1/token?grant_type=refresh_token")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+            conn.doOutput = true
+            conn.connectTimeout = 10000
+            conn.readTimeout = 10000
+
+            val body = JSONObject().apply {
+                put("refresh_token", session.refreshToken)
+            }
+
+            val writer = OutputStreamWriter(conn.outputStream)
+            writer.write(body.toString())
+            writer.flush()
+            writer.close()
+
+            val responseCode = conn.responseCode
+            if (responseCode in 200..299) {
+                val reader = BufferedReader(InputStreamReader(conn.inputStream))
+                val responseText = reader.readText()
+                reader.close()
+
+                val json = JSONObject(responseText)
+                val newAccessToken = json.optString("access_token", "")
+                val newRefreshToken = json.optString("refresh_token", session.refreshToken)
+                val userObj = json.optJSONObject("user")
+                val userId = userObj?.optString("id", session.userId) ?: session.userId
+
+                if (newAccessToken.isNotEmpty()) {
+                    session.accessToken = newAccessToken
+                    session.refreshToken = newRefreshToken
+
+                    val prefs = context.getSharedPreferences(AUTH_PREFS, Context.MODE_PRIVATE)
+                    prefs.edit()
+                        .putString("access_token", newAccessToken)
+                        .putString("refresh_token", newRefreshToken)
+                        .apply()
+
+                    Log.d(TAG, "NativeSmsProcessor: successfully refreshed Supabase JWT token natively!")
+                    return session
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "NativeSmsProcessor: token refresh exception", e)
+        }
         return null
     }
 
@@ -514,7 +573,18 @@ object NativeSmsProcessor {
         val category: String
     )
 
-    private fun lookupMerchantMapping(userId: String, accessToken: String, rawVpa: String): MerchantMapping? {
+    private fun lookupMerchantMapping(context: Context, session: UserSession, rawVpa: String): MerchantMapping? {
+        val result = executeLookupMerchantMapping(session.userId, session.accessToken, rawVpa)
+        if (result.first == 401) {
+            val refreshedSession = refreshSupabaseToken(context, session)
+            if (refreshedSession != null) {
+                return executeLookupMerchantMapping(refreshedSession.userId, refreshedSession.accessToken, rawVpa).second
+            }
+        }
+        return result.second
+    }
+
+    private fun executeLookupMerchantMapping(userId: String, accessToken: String, rawVpa: String): Pair<Int, MerchantMapping?> {
         try {
             val encodedVpa = Uri.encode(rawVpa.lowercase())
             val url = URL("$SUPABASE_URL/rest/v1/merchant_mappings?user_id=eq.$userId&raw_vpa=eq.$encodedVpa&select=friendly_name,category")
@@ -537,25 +607,45 @@ object NativeSmsProcessor {
                     val friendlyName = obj.optString("friendly_name", "")
                     val category = obj.optString("category", "Other")
                     if (friendlyName.isNotEmpty()) {
-                        return MerchantMapping(friendlyName, category)
+                        return Pair(responseCode, MerchantMapping(friendlyName, category))
                     }
                 }
+                return Pair(responseCode, null)
             }
             conn.disconnect()
+            return Pair(responseCode, null)
         } catch (e: Exception) {
             Log.e(TAG, "Error looking up merchant mapping", e)
+            return Pair(500, null)
         }
-        return null
     }
 
     private fun saveExpenseToSupabase(
+        context: Context,
+        session: UserSession,
+        amount: Long,
+        merchant: String,
+        category: String,
+        expenseDate: String
+    ): Boolean {
+        var responseCode = executeSaveExpenseToSupabase(session.userId, session.accessToken, amount, merchant, category, expenseDate)
+        if (responseCode == 401) {
+            val refreshedSession = refreshSupabaseToken(context, session)
+            if (refreshedSession != null) {
+                responseCode = executeSaveExpenseToSupabase(refreshedSession.userId, refreshedSession.accessToken, amount, merchant, category, expenseDate)
+            }
+        }
+        return responseCode in 200..299
+    }
+
+    private fun executeSaveExpenseToSupabase(
         userId: String,
         accessToken: String,
         amount: Long,
         merchant: String,
         category: String,
         expenseDate: String
-    ): Boolean {
+    ): Int {
         try {
             val url = URL("$SUPABASE_URL/rest/v1/expenses")
             val conn = url.openConnection() as HttpURLConnection
@@ -583,14 +673,33 @@ object NativeSmsProcessor {
             writer.close()
 
             val responseCode = conn.responseCode
-            return responseCode in 200..299
+            return responseCode
         } catch (e: Exception) {
-            Log.e(TAG, "Supabase REST API call failed", e)
-            return false
+            Log.e(TAG, "Supabase REST API call failed (expenses)", e)
+            return 500
         }
     }
 
     private fun savePendingExpenseToSupabase(
+        context: Context,
+        session: UserSession,
+        rawSms: String,
+        amount: Long,
+        rawVpa: String?,
+        vpaType: String,
+        parsedDate: String
+    ): Boolean {
+        var responseCode = executeSavePendingExpenseToSupabase(session.userId, session.accessToken, rawSms, amount, rawVpa, vpaType, parsedDate)
+        if (responseCode == 401) {
+            val refreshedSession = refreshSupabaseToken(context, session)
+            if (refreshedSession != null) {
+                responseCode = executeSavePendingExpenseToSupabase(refreshedSession.userId, refreshedSession.accessToken, rawSms, amount, rawVpa, vpaType, parsedDate)
+            }
+        }
+        return responseCode in 200..299
+    }
+
+    private fun executeSavePendingExpenseToSupabase(
         userId: String,
         accessToken: String,
         rawSms: String,
@@ -598,7 +707,7 @@ object NativeSmsProcessor {
         rawVpa: String?,
         vpaType: String,
         parsedDate: String
-    ): Boolean {
+    ): Int {
         try {
             val url = URL("$SUPABASE_URL/rest/v1/pending_sms_expenses")
             val conn = url.openConnection() as HttpURLConnection
@@ -627,10 +736,10 @@ object NativeSmsProcessor {
             writer.close()
 
             val responseCode = conn.responseCode
-            return responseCode in 200..299
+            return responseCode
         } catch (e: Exception) {
             Log.e(TAG, "Supabase REST API call failed (pending)", e)
-            return false
+            return 500
         }
     }
 
@@ -784,23 +893,25 @@ class SmsReceiverModule(private val reactContext: ReactApplicationContext) :
         private const val AUTH_PREFS = "expensify_auth_prefs"
         private const val KEY_USER_ID = "user_id"
         private const val KEY_ACCESS_TOKEN = "access_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
     }
 
     override fun getName(): String = "SmsReceiverModule"
 
     @ReactMethod
-    fun saveAuthToken(userId: String, accessToken: String, promise: Promise) {
+    fun saveAuthToken(userId: String, accessToken: String, refreshToken: String, promise: Promise) {
         try {
             val prefs = reactContext.getSharedPreferences(AUTH_PREFS, Context.MODE_PRIVATE)
             prefs.edit()
                 .putString(KEY_USER_ID, userId)
                 .putString(KEY_ACCESS_TOKEN, accessToken)
+                .putString(KEY_REFRESH_TOKEN, refreshToken)
                 .apply()
 
-            Log.d("ExpensifySMS", "SmsReceiverModule: saved auth token for user: \$userId")
+            Log.d("ExpensifySMS", "SmsReceiverModule: saved auth & refresh tokens for user: \$userId")
             promise.resolve(true)
         } catch (e: Exception) {
-            Log.e("ExpensifySMS", "SmsReceiverModule: failed to save auth token", e)
+            Log.e("ExpensifySMS", "SmsReceiverModule: failed to save auth tokens", e)
             promise.reject("AUTH_SAVE_ERROR", e.message, e)
         }
     }
@@ -924,6 +1035,7 @@ function withSmsManifest(config) {
 
     const requiredPermissions = [
       'android.permission.WAKE_LOCK',
+      'android.permission.POST_NOTIFICATIONS',
       'android.permission.FOREGROUND_SERVICE',
       'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
     ];
@@ -937,7 +1049,6 @@ function withSmsManifest(config) {
       }
     }
 
-    // Service declaration
     const services = application.service || [];
     const serviceDeclared = services.some(
       (s) => s.$?.['android:name'] === '.SmsForegroundService',
@@ -964,7 +1075,6 @@ function withSmsManifest(config) {
       ];
     }
 
-    // Receiver declaration
     const receivers = application.receiver || [];
     const receiverDeclared = receivers.some(
       (r) => r.$?.['android:name'] === '.SmsReceiver',

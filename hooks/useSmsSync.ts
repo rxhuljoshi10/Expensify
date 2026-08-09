@@ -38,17 +38,30 @@ export function useSmsSync(): void {
 
     const requestPermissions = async () => {
       try {
-        const granted = await PermissionsAndroid.requestMultiple([
+        const permissionsToRequest: any[] = [
           PermissionsAndroid.PERMISSIONS.READ_SMS,
           PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
-        ]);
+        ];
+
+        // On Android 13+ (API 33+), POST_NOTIFICATIONS runtime permission must be explicitly requested
+        if (typeof Platform.Version === 'number' && Platform.Version >= 33) {
+          permissionsToRequest.push('android.permission.POST_NOTIFICATIONS');
+        }
+
+        const granted = await PermissionsAndroid.requestMultiple(permissionsToRequest);
+
+        // Also request expo-notifications permission prompt for full OS compatibility
+        try {
+          const Notifications = require('expo-notifications');
+          await Notifications.requestPermissionsAsync();
+        } catch (_e) {}
 
         const hasPermissions =
           granted['android.permission.READ_SMS'] === PermissionsAndroid.RESULTS.GRANTED &&
           granted['android.permission.RECEIVE_SMS'] === PermissionsAndroid.RESULTS.GRANTED;
 
         if (hasPermissions) {
-          console.log('[useSmsSync] SMS permissions granted');
+          console.log('[useSmsSync] SMS & Notification permissions granted');
         } else {
           console.log('[useSmsSync] SMS permissions not granted');
         }
@@ -67,12 +80,16 @@ export function useSmsSync(): void {
     const syncNativeAuth = async () => {
       try {
         const { data } = await supabase.auth.getSession();
-        const token = data.session?.access_token;
-        if (token) {
+        const session = data.session;
+        if (session?.access_token && session?.refresh_token) {
           const { NativeModules } = require('react-native');
           if (NativeModules.SmsReceiverModule?.saveAuthToken) {
-            await NativeModules.SmsReceiverModule.saveAuthToken(userId, token);
-            console.log('[useSmsSync] Synced auth token to native SharedPreferences');
+            await NativeModules.SmsReceiverModule.saveAuthToken(
+              userId,
+              session.access_token,
+              session.refresh_token,
+            );
+            console.log('[useSmsSync] Synced auth & refresh tokens to native SharedPreferences');
           }
           if (smsSyncEnabled && NativeModules.SmsReceiverModule?.startForegroundService) {
             await NativeModules.SmsReceiverModule.startForegroundService();
