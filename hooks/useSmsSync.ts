@@ -4,7 +4,8 @@
 // Actual SMS processing is handled by HeadlessJS (SmsHeadlessTask in index.ts).
 
 import { useEffect, useRef } from 'react';
-import { Platform, PermissionsAndroid, AppState, AppStateStatus } from 'react-native';
+import { Platform, PermissionsAndroid, AppState, AppStateStatus, Alert, NativeModules } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { focusManager, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
@@ -12,6 +13,51 @@ import { useSettingsStore } from '../store/settingsStore';
 import { useUserCategories } from './useUserCategories';
 import { processOfflineQueue, expirePendingExpenses } from '../lib/smsSync';
 import { supabase } from '../lib/supabase';
+
+// ── One-time background permission prompts ────────────────────────────────
+// Shows sequentially after SMS permissions are granted (like notification permission).
+// AsyncStorage flags ensure each dialog is only shown once per install.
+async function promptBackgroundPermissionsIfNeeded(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  try {
+    // Step 1: Battery Optimization system dialog (Android native prompt)
+    const battShown = await AsyncStorage.getItem('expensify_battery_opt_prompted');
+    if (!battShown) {
+      await AsyncStorage.setItem('expensify_battery_opt_prompted', '1');
+      if (NativeModules.SmsReceiverModule?.requestBatteryOptimization) {
+        await NativeModules.SmsReceiverModule.requestBatteryOptimization();
+      }
+    }
+
+    // Step 2: OEM AutoStart settings (shown as an explanatory Alert, opens settings page)
+    const autoShown = await AsyncStorage.getItem('expensify_autostart_prompted');
+    if (!autoShown) {
+      await AsyncStorage.setItem('expensify_autostart_prompted', '1');
+      if (NativeModules.SmsReceiverModule?.openAutoStartSettings) {
+        await new Promise<void>((resolve) => {
+          Alert.alert(
+            '📱 Enable AutoStart',
+            'For reliable SMS expense detection when your phone is idle, please enable AutoStart for Expensify.\n\nThis is required on Xiaomi, Oppo, Vivo, Realme, and similar devices.',
+            [
+              { text: 'Skip', style: 'cancel', onPress: resolve },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  NativeModules.SmsReceiverModule.openAutoStartSettings();
+                  resolve();
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('[useSmsSync] Background permission prompt error:', e);
+  }
+}
 
 /**
  * Hook that manages the SMS sync lifecycle & UI synchronization:
@@ -31,7 +77,7 @@ export function useSmsSync(): void {
   const userId = user?.id;
   const categoryNames = categories?.map(c => c.name);
 
-  // ── 1. Request SMS Permissions ───────────────────────────────────────
+  // ── 1. Request SMS Permissions → then Battery + AutoStart prompts ────
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     if (!userId || !smsSyncEnabled) return;
@@ -62,6 +108,8 @@ export function useSmsSync(): void {
 
         if (hasPermissions) {
           console.log('[useSmsSync] SMS & Notification permissions granted');
+          // After permissions granted, prompt for battery + autostart (one-time each)
+          await promptBackgroundPermissionsIfNeeded();
         } else {
           console.log('[useSmsSync] SMS permissions not granted');
         }
