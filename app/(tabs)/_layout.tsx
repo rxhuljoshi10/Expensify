@@ -1,13 +1,29 @@
 // app/(tabs)/_layout.tsx
-import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { TouchableOpacity, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useTheme } from '../../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '../../store/authStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { useSmsSync } from '../../hooks/useSmsSync';
+import { registerForPushNotifications } from '../../lib/notifications';
 
 export default function TabsLayout() {
   const router = useRouter();
   const theme = useTheme();
+  const { user } = useAuthStore();
+
+  // ── SMS Auto-Sync & Push Notifications (Only runs after login on Home/Tabs) ──
+  useSmsSync();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const { notificationsEnabled } = useSettingsStore.getState();
+    if (notificationsEnabled) {
+      registerForPushNotifications(user.id);
+    }
+  }, [user?.id]);
 
   return (
     <Tabs

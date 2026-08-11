@@ -35,9 +35,6 @@ function AuthGuard() {
   const theme = useTheme();
   const { triggerGeneration, isGenerating } = useInsightStore();
 
-  // ── SMS Auto-Sync listener (Android only) ──────────────────────────
-  useSmsSync();
-
   useEffect(() => {
     loadSettings();
     const unsubscribe = initialize();
@@ -50,12 +47,11 @@ function AuthGuard() {
     }
   }, [isLoading]);
 
-  // Global Auto-Trigger Logic
+  // Global Auto-Trigger Insights Logic
   useEffect(() => {
     if (isLoading || !session?.user?.id || isGenerating) return;
 
     const checkAndTrigger = async () => {
-      // Check latest insight date
       const { data: latest } = await supabase
         .from('insights')
         .select('generated_at')
@@ -75,6 +71,7 @@ function AuthGuard() {
     checkAndTrigger();
   }, [session?.user?.id, isLoading]);
 
+  // Routing Guard: Redirect to login or home/onboarding based on auth session
   useEffect(() => {
     if (isLoading) return;
 
@@ -87,16 +84,14 @@ function AuthGuard() {
       const hasName = !!session.user.user_metadata?.full_name;
       
       if (!hasName && !isSetup) {
-        // Needs onboarding
         router.replace('/onboarding');
       } else if (hasName && (inAuthGroup || isSetup)) {
-        // Logged in and set up -> go to home 
         router.replace('/(tabs)/home');
       }
     }
   }, [session, isLoading, segments]);
 
-  // ── Sync user profile to public.users on every app open ──────────────
+  // Sync user profile to public.users on every app open
   useEffect(() => {
     if (!session?.user) return;
     const { id, email, user_metadata } = session.user;
@@ -109,15 +104,7 @@ function AuthGuard() {
     );
   }, [session?.user?.id]);
 
-  // ── Push notification registration + tap listeners ───────────────────
   useEffect(() => {
-    if (!session?.user?.id) return;
-
-    const { notificationsEnabled } = useSettingsStore.getState();
-    if (notificationsEnabled) {
-      registerForPushNotifications(session.user.id);
-    }
-
     const cleanup = setupNotificationResponseListener((route) => {
       router.push(route as any);
     });
@@ -127,7 +114,7 @@ function AuthGuard() {
     });
 
     return cleanup;
-  }, [session?.user?.id]);
+  }, []);
 
   return (
     <Stack
