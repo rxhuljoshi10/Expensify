@@ -156,7 +156,7 @@ export default function NotificationSettingsScreen() {
         {/* ── SMS Auto-Sync (Android only) ── */}
         {Platform.OS === 'android' && (
           <>
-            <Text style={styles.sectionHeader}>SMS Auto-Sync</Text>
+            <Text style={styles.sectionHeader}>SMS Auto-Sync & Background Execution</Text>
             <View style={styles.card}>
               <View style={styles.row}>
                 <View style={[styles.rowIcon, { backgroundColor: '#6C5CE722' }]}>
@@ -182,6 +182,72 @@ export default function NotificationSettingsScreen() {
                   thumbColor="#fff"
                 />
               </View>
+
+              {smsSyncEnabled && (
+                <>
+                  <View style={styles.divider} />
+
+                  {/* 1-Tap Battery Optimization Prompt */}
+                  <TouchableOpacity
+                    style={styles.actionRow}
+                    onPress={async () => {
+                      const { NativeModules } = require('react-native');
+                      if (NativeModules.SmsReceiverModule?.requestBatteryOptimization) {
+                        try {
+                          await NativeModules.SmsReceiverModule.requestBatteryOptimization();
+                          toast.success('Opening Battery Optimization request...');
+                        } catch (e) {
+                          toast.error('Could not open Battery settings');
+                        }
+                      } else {
+                        toast.info('Feature available on Android native builds');
+                      }
+                    }}
+                  >
+                    <View style={[styles.rowIcon, { backgroundColor: '#00CEC922' }]}>
+                      <Ionicons name="battery-charging-outline" size={17} color="#00CEC9" />
+                    </View>
+                    <View style={styles.rowContent}>
+                      <Text style={styles.rowLabel}>Allow Unrestricted Background</Text>
+                      <Text style={styles.rowDesc}>
+                        Prevents Android OS from killing SMS detection when device is sleeping
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+                  </TouchableOpacity>
+
+                  <View style={styles.divider} />
+
+                  {/* 1-Tap OEM AutoStart Settings Launcher */}
+                  <TouchableOpacity
+                    style={styles.actionRow}
+                    onPress={async () => {
+                      const { NativeModules } = require('react-native');
+                      if (NativeModules.SmsReceiverModule?.openAutoStartSettings) {
+                        try {
+                          await NativeModules.SmsReceiverModule.openAutoStartSettings();
+                          toast.success('Opening Autostart settings screen...');
+                        } catch (e) {
+                          toast.error('Could not open Autostart settings');
+                        }
+                      } else {
+                        toast.info('Feature available on Android native builds');
+                      }
+                    }}
+                  >
+                    <View style={[styles.rowIcon, { backgroundColor: '#FF767522' }]}>
+                      <Ionicons name="flash-outline" size={17} color="#FF7675" />
+                    </View>
+                    <View style={styles.rowContent}>
+                      <Text style={styles.rowLabel}>Enable AutoStart Permission</Text>
+                      <Text style={styles.rowDesc}>
+                        Required for Xiaomi, Oppo, Vivo, Samsung & Realme devices
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </>
         )}
@@ -507,6 +573,13 @@ function createStyles(theme: Theme) {
 
     // Row
     row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 12,
+    },
+    actionRow: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 16,

@@ -883,7 +883,13 @@ class SmsReceiver : BroadcastReceiver() {
 
 const SMS_RECEIVER_MODULE_KT = `package com.rxhuljoshi.expensify
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -920,13 +926,99 @@ class SmsReceiverModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
-    // Foreground service removed — stubbed as no-ops so existing JS callers don't crash
     @ReactMethod
-    fun startForegroundService(promise: Promise) { promise.resolve(true) }
+    fun requestBatteryOptimization(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val packageName = reactContext.packageName
+                val pm = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                    val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = Uri.parse("package:\$packageName")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    reactContext.startActivity(intent)
+                    promise.resolve(true)
+                } else {
+                    promise.resolve(false)
+                }
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            Log.e("ExpensifySMS", "Failed to request battery optimization exemption", e)
+            promise.reject("BATTERY_OPT_ERROR", e.message, e)
+        }
+    }
 
     @ReactMethod
-    fun stopForegroundService(promise: Promise) { promise.resolve(true) }
+    fun openAutoStartSettings(promise: Promise) {
+        try {
+            val packageName = reactContext.packageName
+            val manufacturer = Build.MANUFACTURER.lowercase()
+            var intent: Intent? = null
 
+            when {
+                manufacturer.contains("xiaomi") || manufacturer.contains("redmi") || manufacturer.contains("poco") -> {
+                    intent = Intent().apply {
+                        component = ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")
+                    }
+                }
+                manufacturer.contains("oppo") || manufacturer.contains("realme") -> {
+                    intent = Intent().apply {
+                        component = ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")
+                    }
+                }
+                manufacturer.contains("vivo") || manufacturer.contains("iqoo") -> {
+                    intent = Intent().apply {
+                        component = ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity")
+                    }
+                }
+                manufacturer.contains("samsung") -> {
+                    intent = Intent().apply {
+                        component = ComponentName("com.samsung.android.looper", "com.samsung.android.sm.ui.battery.BatteryActivity")
+                    }
+                }
+                manufacturer.contains("oneplus") -> {
+                    intent = Intent().apply {
+                        component = ComponentName("com.oneplus.security", "com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity")
+                    }
+                }
+                manufacturer.contains("huawei") || manufacturer.contains("honor") -> {
+                    intent = Intent().apply {
+                        component = ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity")
+                    }
+                }
+            }
+
+            var launched = false
+            if (intent != null) {
+                try {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    reactContext.startActivity(intent)
+                    launched = true
+                } catch (_: Exception) {
+                    launched = false
+                }
+            }
+
+            if (!launched) {
+                val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:\$packageName")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                reactContext.startActivity(fallbackIntent)
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.e("ExpensifySMS", "Failed to open AutoStart settings", e)
+            promise.reject("AUTOSTART_ERROR", e.message, e)
+        }
+    }
+
+    // Stubbed compatibility methods
+    @ReactMethod fun startForegroundService(promise: Promise) { promise.resolve(true) }
+    @ReactMethod fun stopForegroundService(promise: Promise) { promise.resolve(true) }
     @ReactMethod fun startListening(promise: Promise) { promise.resolve(null) }
     @ReactMethod fun stopListening(promise: Promise) { promise.resolve(null) }
     @ReactMethod fun addListener(eventName: String) {}
@@ -1026,6 +1118,7 @@ function withSmsManifest(config) {
       'android.permission.POST_NOTIFICATIONS',
       'android.permission.FOREGROUND_SERVICE',
       'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
+      'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
     ];
 
     for (const perm of requiredPermissions) {
