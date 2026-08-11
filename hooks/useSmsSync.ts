@@ -91,6 +91,10 @@ export function useSmsSync(): void {
             );
             console.log('[useSmsSync] Synced auth & refresh tokens to native SharedPreferences');
           }
+          // if (smsSyncEnabled && NativeModules.SmsReceiverModule?.startForegroundService) {
+          //   await NativeModules.SmsReceiverModule.startForegroundService();
+          //   console.log('[useSmsSync] Started native SMS foreground service');
+          // }
         }
       } catch (e) {
         console.error('[useSmsSync] Failed to sync auth to native:', e);

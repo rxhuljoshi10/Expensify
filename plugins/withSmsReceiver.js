@@ -1068,10 +1068,89 @@ function withSmsManifest(config) {
   });
 }
 
+const NOTIFICATION_ICON_VECTOR_XML = `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Main E mark -->
+    <path
+        android:name="e_mark"
+        android:fillColor="#FFFFFFFF"
+        android:pathData="
+            M 8.695,7.289
+            H 15.305
+            V 9.234
+            H 11.086
+            V 10.945
+            H 14.484
+            V 12.961
+            H 11.086
+            V 14.766
+            H 15.305
+            V 16.711
+            H 8.695
+            Z" />
+
+    <!-- Upper/left circular segment -->
+    <path
+        android:name="top_left_arc"
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.50"
+        android:strokeLineCap="round"
+        android:pathData="
+            M 5.473,17.674
+            A 8.648,8.648 0 0 1 17.559,5.375" />
+
+    <!-- Right circular segment -->
+    <path
+        android:name="right_arc"
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.50"
+        android:strokeLineCap="round"
+        android:pathData="
+            M 18.721,6.557
+            A 8.648,8.648 0 0 1 18.625,17.559" />
+
+    <!-- Bottom circular segment -->
+    <path
+        android:name="bottom_arc"
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.50"
+        android:strokeLineCap="round"
+        android:pathData="
+            M 17.559,18.625
+            A 8.648,8.648 0 0 1 6.557,18.721" />
+
+</vector>
+`;
+
+function withNotificationIcon(config) {
+  return withDangerousMod(config, [
+    'android',
+    (config) => {
+      const platformRoot = config.modRequest.platformProjectRoot;
+      const drawableDir = path.join(platformRoot, 'app/src/main/res/drawable');
+      fs.mkdirSync(drawableDir, { recursive: true });
+      fs.writeFileSync(path.join(drawableDir, 'ic_notification.xml'), NOTIFICATION_ICON_VECTOR_XML, 'utf8');
+
+      console.log('[withSmsReceiver] Generated ic_notification.xml vector drawable');
+      return config;
+    },
+  ]);
+}
+
 module.exports = function withSmsReceiver(config) {
   config = withSmsKotlinFiles(config);
+  config = withNotificationIcon(config);
   config = withSmsMainApplication(config);
   config = withSmsGradleDependencies(config);
   config = withSmsManifest(config);
   return config;
 };
+
