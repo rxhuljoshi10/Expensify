@@ -112,7 +112,11 @@ export default function RecurringScreen() {
                         return (
                             <View style={[styles.card, !item.is_active && styles.cardPaused]}>
                                 {/* Top row */}
-                                <View style={styles.cardTop}>
+                                <TouchableOpacity
+                                    style={styles.cardTop}
+                                    onPress={() => router.push({ pathname: '/edit-recurring', params: { id: item.id } })}
+                                    activeOpacity={0.7}
+                                >
                                     <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
                                         <Ionicons name={cat.icon as any} size={20} color={cat.color} />
                                     </View>
@@ -131,7 +135,7 @@ export default function RecurringScreen() {
                                         trackColor={{ true: theme.primary, false: theme.separator }}
                                         thumbColor="#fff"
                                     />
-                                </View>
+                                </TouchableOpacity>
 
                                 {/* Due date row */}
                                 <View style={styles.cardBottom}>
@@ -154,7 +158,14 @@ export default function RecurringScreen() {
                                     </View>
                                     <Text style={styles.nextDate}>{item.next_due_date}</Text>
 
-                                    <TouchableOpacity onPress={() => handleDelete(item)}>
+                                    <TouchableOpacity
+                                        style={styles.actionBtn}
+                                        onPress={() => router.push({ pathname: '/edit-recurring', params: { id: item.id } })}
+                                    >
+                                        <Text style={styles.editText}>Edit</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item)}>
                                         <Text style={styles.deleteText}>Delete</Text>
                                     </TouchableOpacity>
                                 </View>
@@ -215,6 +226,8 @@ function createStyles(theme: Theme) {
         dueTextSoon: { color: '#FF9500' },
         dueTextOverdue: { color: theme.danger },
         nextDate: { flex: 1, fontSize: 12, color: theme.textSecondary, textAlign: 'right' },
+        actionBtn: { paddingHorizontal: 4, paddingVertical: 2 },
+        editText: { fontSize: 13, color: theme.primary, fontWeight: '600' },
         deleteText: { fontSize: 13, color: theme.danger },
 
         emptyContainer: {
@@ -232,4 +245,4 @@ function createStyles(theme: Theme) {
         },
         emptyButtonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
     });
-}
+}

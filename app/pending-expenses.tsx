@@ -117,6 +117,7 @@ export default function PendingExpensesScreen() {
 
             {/* Current pending expense card */}
             <PendingExpenseCard
+              key={currentExpense.id}
               expense={currentExpense}
               categories={categories}
               onSave={handleSave}

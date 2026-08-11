@@ -6,7 +6,7 @@ import {
   requestRecordingPermissionsAsync,
   useAudioRecorder,
 } from "expo-audio";
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 
 export type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
 
@@ -64,6 +64,10 @@ export const useVoiceRecorder = () => {
     try {
       const { granted } = await requestRecordingPermissionsAsync();
       if (!granted) {
+        Alert.alert(
+          'Microphone Permission Required',
+          'Expensify needs microphone permission to record voice expenses. Please enable microphone access in your device settings.'
+        );
         setErrorMessage('Microphone permission denied');
         setState('error');
         return;

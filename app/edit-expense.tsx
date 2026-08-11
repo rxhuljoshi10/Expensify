@@ -81,6 +81,12 @@ export default function EditExpenseScreen() {
     }
 
     const handlePickNewAttachment = async () => {
+        const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!granted) {
+            toast.error('Photo library permission is required to attach receipt');
+            return;
+        }
+
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             quality: 1,

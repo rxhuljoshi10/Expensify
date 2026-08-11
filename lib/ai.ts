@@ -69,7 +69,7 @@ export const categorizeExpense = async (
 };
 
 
-export const pickAndScanBill = async (categories?: string[]): Promise<{
+export const pickAndScanBill = async (categories?: string[], onScanStart?: () => void): Promise<{
   merchant: string;
   total: number | null;
   date: string | null;
@@ -96,6 +96,26 @@ export const pickAndScanBill = async (categories?: string[]): Promise<{
     });
 
     if (choice === 'cancel') return null;
+
+    if (choice === 'camera') {
+      const { granted } = await ImagePicker.requestCameraPermissionsAsync();
+      if (!granted) {
+        Alert.alert(
+          'Camera Permission Required',
+          'Expensify needs camera permission to scan bills and receipts. Please enable camera access in your device settings.'
+        );
+        return null;
+      }
+    } else {
+      const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!granted) {
+        Alert.alert(
+          'Photo Library Permission Required',
+          'Expensify needs photo library permission to select receipts. Please enable photo access in your device settings.'
+        );
+        return null;
+      }
+    }
 
     const pickerOptions: ImagePicker.ImagePickerOptions = {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,

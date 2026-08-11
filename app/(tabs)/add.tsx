@@ -209,49 +209,57 @@ export default function AddExpenseScreen() {
         }
     };
 
-    // app/(tabs)/add.tsx — update handleScanBill
     const handleScanBill = async () => {
-        setIsScanning(true);
+        try {
+            const result = await pickAndScanBill(categories.map(c => c.name), () => {
+                setIsScanning(true);
+            });
 
-        const result = await pickAndScanBill(categories.map(c => c.name));
-        setIsScanning(false);
+            if (!result) {
+                // User cancelled or error — don't show error if they just cancelled
+                return;
+            }
 
-        if (!result) {
-            // User cancelled or error — don't show error if they just cancelled
-            return;
+            setSource('scan');
+
+            if (result.confidence === 'low') {
+                toast.info('Receipt unclear — please check and correct the details');
+            } else if (result.confidence === 'medium') {
+                toast.info('Please verify the scanned details');
+            } else {
+                toast.success('Receipt scanned successfully');
+            }
+
+            // Prefill form with scanned data
+            if (result.total) setAmount(String(result.total));
+            if (result.merchant) setMerchant(result.merchant);
+            if (result.category) setCategory(result.category as Category);
+            if (result.date) {
+                const parsed = new Date(result.date);
+                if (!isNaN(parsed.getTime())) setDate(parsed);
+            }
+
+            // If items were found, store as structured items (NOT in description)
+            if (result.items?.length > 0) {
+                setScannedItems(result.items);
+            }
+
+            // Auto-attach the scanned bill image
+            setAttachmentUri(result.imageUri);
+            setAttachmentBase64(result.base64);
+        } finally {
+            setIsScanning(false);
         }
-
-        setSource('scan');
-
-        if (result.confidence === 'low') {
-            toast.info('Receipt unclear — please check and correct the details');
-        } else if (result.confidence === 'medium') {
-            toast.info('Please verify the scanned details');
-        } else {
-            toast.success('Receipt scanned successfully');
-        }
-
-        // Prefill form with scanned data
-        if (result.total) setAmount(String(result.total));
-        if (result.merchant) setMerchant(result.merchant);
-        if (result.category) setCategory(result.category as Category);
-        if (result.date) {
-            const parsed = new Date(result.date);
-            if (!isNaN(parsed.getTime())) setDate(parsed);
-        }
-
-        // If items were found, store as structured items (NOT in description)
-        if (result.items?.length > 0) {
-            setScannedItems(result.items);
-        }
-
-        // Auto-attach the scanned bill image
-        setAttachmentUri(result.imageUri);
-        setAttachmentBase64(result.base64);
     };
 
     // Manually pick a photo from camera/gallery to attach
     const handlePickAttachment = async () => {
+        const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!granted) {
+            toast.error('Photo library permission is required to attach receipt');
+            return;
+        }
+
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             quality: 1,
@@ -291,19 +299,27 @@ export default function AddExpenseScreen() {
                 {/* ── Quick-input row: Scan + Voice ── */}
                 <View style={styles.quickRow}>
                     <TouchableOpacity
-                        style={[styles.quickButton, { flex: 1.6 }]}
+                        style={[styles.quickButton, { flex: 1.6 }, isScanning && { opacity: 0.85 }]}
                         onPress={handleScanBill}
                         disabled={isScanning}
                         activeOpacity={0.7}
                     >
                         <View style={styles.quickIcon}>
-                            <Ionicons name="camera" size={20} color={theme.primary} />
+                            {isScanning ? (
+                                <ActivityIndicator size="small" color={theme.primary} />
+                            ) : (
+                                <Ionicons name="camera" size={20} color={theme.primary} />
+                            )}
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={styles.quickTitle}>{isScanning ? 'Scanning...' : 'Scan Receipt'}</Text>
-                            <Text style={styles.quickSub}>Auto-fill from photo</Text>
+                            <Text style={styles.quickSub}>{isScanning ? 'AI processing...' : 'Auto-fill from photo'}</Text>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+                        {isScanning ? (
+                            <ActivityIndicator size="small" color={theme.primary} />
+                        ) : (
+                            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+                        )}
                     </TouchableOpacity>
 
                     <TouchableOpacity

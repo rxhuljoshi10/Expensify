@@ -114,25 +114,30 @@ let pendingBatchCount = 0;
 let pendingBatchResetTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function sendPendingBatchedNotification(
+  userId: string,
   amount: number,
   merchantName: string,
 ): Promise<void> {
   try {
-    pendingBatchCount += 1;
+    let pendingCount = 1;
+    const { count } = await supabase
+      .from('pending_sms_expenses')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'pending');
 
-    if (pendingBatchResetTimer) clearTimeout(pendingBatchResetTimer);
-    pendingBatchResetTimer = setTimeout(() => {
-      pendingBatchCount = 0;
-    }, PENDING_BATCH_WINDOW_MS);
+    if (count != null && count > 0) {
+      pendingCount = count;
+    }
 
     let title = '';
     let body = '';
 
-    if (pendingBatchCount === 1) {
+    if (pendingCount <= 1) {
       title = 'New Expense Detected';
       body = `₹${amount} at ${merchantName}. Tap to name this merchant.`;
     } else {
-      title = `📱 ${pendingBatchCount} Pending Expenses`;
+      title = `📱 ${pendingCount} Pending Expenses`;
       body = `Tap to review and name these merchants.`;
     }
 
@@ -406,7 +411,7 @@ export async function processSms(
         );
         if (saved) {
           const displayName = formatMerchantFromVpa(classification.handle, 'dynamic_qr');
-          await sendPendingBatchedNotification(amount, displayName);
+          await sendPendingBatchedNotification(userId, amount, displayName);
         }
       }
       break;

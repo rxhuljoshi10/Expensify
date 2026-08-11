@@ -2,7 +2,7 @@
 // Card component for processing a single pending SMS expense.
 // Shows amount, raw VPA, timestamp, and provides inputs for naming the merchant.
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator,
@@ -31,6 +31,12 @@ export default function PendingExpenseCard({
   const styles = createStyles(theme);
   const [merchantName, setMerchantName] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Always reset inputs to blank when moving to a new pending expense
+  useEffect(() => {
+    setMerchantName('');
+    setSelectedCategory(null);
+  }, [expense.id]);
 
   const amountRupees = (expense.amount / 100).toLocaleString('en-IN', {
     minimumFractionDigits: 0,

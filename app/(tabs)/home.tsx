@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { getLocalISODate } from '../../lib/date';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -28,6 +28,9 @@ import { toast } from '../../lib/toast';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 
+// Module-level flag: persists across re-renders and tab navigation within the same JS session
+let pendingNoticeShown = false;
+
 export default function HomeScreen() {
   const theme = useTheme();
   const { user } = useAuthStore();
@@ -49,14 +52,16 @@ export default function HomeScreen() {
     }
   }, [group, viewMode, setViewMode]);
 
-  // Subtle toast nudge after 10 seconds if pending expenses exist
+  // Show a subtle toast nudge after 10 seconds, only once per app session (not on every home visit)
   useEffect(() => {
-    if (pendingCount <= 0 || !isFocused) return;
+    if (pendingCount <= 0) return;
+    if (pendingNoticeShown) return;
     const timer = setTimeout(() => {
       toast.info(`📱 You have ${pendingCount} pending expense${pendingCount > 1 ? 's' : ''} to review`);
+      pendingNoticeShown = true;
     }, 10000);
     return () => clearTimeout(timer);
-  }, [pendingCount, isFocused]);
+  }, [pendingCount]);
 
   const dueTodayCount = recurring.filter(r => {
     return r.is_active && r.next_due_date === getLocalISODate();

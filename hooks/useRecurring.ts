@@ -2,7 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
-import { RecurringExpense, CreateRecurringInput } from '../types/expense';
+import { RecurringExpense, CreateRecurringInput, RecurringFrequency, UpdateRecurringInput } from '../types/expense';
 
 const QUERY_KEY = ['recurring'];
 
@@ -56,6 +56,36 @@ export const useToggleRecurring = () => {
     onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
   });
 };
+
+export const useUpdateRecurring = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...updates
+    }: {
+      id: string;
+      amount?: number;
+      merchant?: string;
+      category?: string;
+      frequency?: RecurringFrequency;
+      next_due_date?: string;
+      is_active?: boolean;
+    }) => {
+      const { data, error } = await supabase
+        .from('recurring_expenses')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+  });
+};
+
 
 export const useDeleteRecurring = () => {
   const queryClient = useQueryClient();

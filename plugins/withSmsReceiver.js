@@ -14,89 +14,8 @@ const fs = require('fs');
 
 // ─── Kotlin source files ──────────────────────────────────────────────────────
 
-const SMS_FOREGROUND_SERVICE_KT = `package com.rxhuljoshi.expensify
-
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.Service
-import android.content.Context
-import android.content.Intent
-import android.os.Build
-import android.os.IBinder
-import android.util.Log
-import androidx.core.app.NotificationCompat
-
-/**
- * Foreground Service that runs a lightweight status notification
- * to keep the Expensify process active on Android 14+ / Android 15.
- */
-class SmsForegroundService : Service() {
-
-    companion object {
-        private const val TAG = "ExpensifySMS"
-        private const val CHANNEL_ID = "expensify_sms_sync_channel"
-        private const val NOTIFICATION_ID = 8888
-
-        fun start(context: Context) {
-            try {
-                val intent = Intent(context, SmsForegroundService::class.java)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
-                Log.d(TAG, "SmsForegroundService start requested")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to start SmsForegroundService", e)
-            }
-        }
-
-        fun stop(context: Context) {
-            try {
-                val intent = Intent(context, SmsForegroundService::class.java)
-                context.stopService(intent)
-                Log.d(TAG, "SmsForegroundService stop requested")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to stop SmsForegroundService", e)
-            }
-        }
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        createNotificationChannel()
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Expensify SMS Auto-Sync")
-            .setContentText("Listening for transaction SMS in background")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .build()
-
-        startForeground(NOTIFICATION_ID, notification)
-        Log.d(TAG, "SmsForegroundService is running in foreground")
-
-        return START_STICKY
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "SMS Auto-Sync Service",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Keeps Expensify SMS background tracking active"
-                setShowBadge(false)
-            }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(channel)
-        }
-    }
-}
-`;
+// SmsForegroundService removed — the SmsReceiver BroadcastReceiver handles SMS natively
+// without needing a persistent foreground service notification.
 
 const NATIVE_SMS_PROCESSOR_KT = `package com.rxhuljoshi.expensify
 
@@ -290,11 +209,11 @@ object NativeSmsProcessor {
                         )
                         if (savedPending) {
                             val displayName = formatMerchantFromVpa(classification.handle, "dynamic_qr")
-                            showNotification(
+                            showPendingNotification(
                                 context,
-                                title = "New Expense Detected",
-                                body = "\${formatRupees(fields.amount)} at \$displayName. Tap to name this merchant.",
-                                targetScreen = "pending-expenses"
+                                session,
+                                fields.amount,
+                                displayName
                             )
                         }
                     }
@@ -743,6 +662,90 @@ object NativeSmsProcessor {
         }
     }
 
+    private fun getPendingCountFromSupabase(session: UserSession): Int {
+        try {
+            val url = URL("\$SUPABASE_URL/rest/v1/pending_sms_expenses?user_id=eq.\${session.userId}&status=eq.pending&select=id")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("apikey", SUPABASE_ANON_KEY)
+            conn.setRequestProperty("Authorization", "Bearer \${session.accessToken}")
+            conn.setRequestProperty("Prefer", "count=exact")
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+
+            val contentRange = conn.getHeaderField("Content-Range")
+            if (contentRange != null && contentRange.contains("/")) {
+                val totalStr = contentRange.substringAfter("/")
+                val count = totalStr.toIntOrNull()
+                if (count != null) return count
+            }
+
+            val reader = BufferedReader(InputStreamReader(conn.inputStream))
+            val sb = StringBuilder()
+            var line: String?
+            while (reader.readLine().also { line = it } != null) {
+                sb.append(line)
+            }
+            reader.close()
+            val array = JSONArray(sb.toString())
+            return array.length()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch pending count", e)
+            return 1
+        }
+    }
+
+    private fun showPendingNotification(
+        context: Context,
+        session: UserSession,
+        amount: Double,
+        merchantName: String
+    ) {
+        val pendingCount = getPendingCountFromSupabase(session)
+
+        val title = if (pendingCount <= 1) {
+            "New Expense Detected"
+        } else {
+            "📱 \$pendingCount Pending Expenses"
+        }
+
+        val body = if (pendingCount <= 1) {
+            "\${formatRupees(amount)} at \$merchantName. Tap to name this merchant."
+        } else {
+            "Tap to review and name these merchants."
+        }
+
+        createNotificationChannel(context)
+
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+            putExtra("screen", "pending-expenses")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            9991,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Fixed ID 9991 ensures Android replaces and collapses pending expense notifications into 1 single notification banner
+        val PENDING_NOTIFICATION_ID = 9991
+
+        val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF03C775.toInt())
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(PENDING_NOTIFICATION_ID, notification)
+    }
+
     private fun showNotification(context: Context, title: String, body: String, targetScreen: String) {
         createNotificationChannel(context)
 
@@ -762,7 +765,8 @@ object NativeSmsProcessor {
         val notification = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(body)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF03C775.toInt())
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
@@ -916,27 +920,12 @@ class SmsReceiverModule(private val reactContext: ReactApplicationContext) :
         }
     }
 
+    // Foreground service removed — stubbed as no-ops so existing JS callers don't crash
     @ReactMethod
-    fun startForegroundService(promise: Promise) {
-        try {
-            SmsForegroundService.start(reactContext)
-            promise.resolve(true)
-        } catch (e: Exception) {
-            Log.e("ExpensifySMS", "Failed to start foreground service", e)
-            promise.reject("SERVICE_START_ERROR", e.message, e)
-        }
-    }
+    fun startForegroundService(promise: Promise) { promise.resolve(true) }
 
     @ReactMethod
-    fun stopForegroundService(promise: Promise) {
-        try {
-            SmsForegroundService.stop(reactContext)
-            promise.resolve(true)
-        } catch (e: Exception) {
-            Log.e("ExpensifySMS", "Failed to stop foreground service", e)
-            promise.reject("SERVICE_STOP_ERROR", e.message, e)
-        }
-    }
+    fun stopForegroundService(promise: Promise) { promise.resolve(true) }
 
     @ReactMethod fun startListening(promise: Promise) { promise.resolve(null) }
     @ReactMethod fun stopListening(promise: Promise) { promise.resolve(null) }
@@ -974,7 +963,6 @@ function withSmsKotlinFiles(config) {
       fs.mkdirSync(packageDir, { recursive: true });
 
       const files = {
-        'SmsForegroundService.kt': SMS_FOREGROUND_SERVICE_KT,
         'NativeSmsProcessor.kt': NATIVE_SMS_PROCESSOR_KT,
         'SmsWorker.kt': SMS_WORKER_KT,
         'SmsReceiver.kt': SMS_RECEIVER_KT,
@@ -1049,31 +1037,7 @@ function withSmsManifest(config) {
       }
     }
 
-    const services = application.service || [];
-    const serviceDeclared = services.some(
-      (s) => s.$?.['android:name'] === '.SmsForegroundService',
-    );
-
-    if (!serviceDeclared) {
-      application.service = [
-        ...services,
-        {
-          $: {
-            'android:name': '.SmsForegroundService',
-            'android:exported': 'false',
-            'android:foregroundServiceType': 'specialUse',
-          },
-          property: [
-            {
-              $: {
-                'android:name': 'android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE',
-                'android:value': 'SMS Background Auto-Sync',
-              },
-            },
-          ],
-        },
-      ];
-    }
+    // SmsForegroundService removed — no manifest service entry needed
 
     const receivers = application.receiver || [];
     const receiverDeclared = receivers.some(

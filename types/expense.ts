@@ -98,6 +98,17 @@ export interface CreateRecurringInput {
   next_due_date: string;
 }
 
+export interface UpdateRecurringInput {
+  id: string;
+  amount?: number;
+  merchant?: string;
+  category?: Category;
+  frequency?: RecurringFrequency;
+  next_due_date?: string;
+  is_active?: boolean;
+}
+
+
 // ── SMS Auto-Expense types ───────────────────────────────────────────
 
 export type VpaType = 'personal' | 'dynamic_qr' | 'brand';
