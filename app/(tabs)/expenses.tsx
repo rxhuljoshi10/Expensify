@@ -13,6 +13,7 @@ import ExpenseListSkeleton from '../../components/ExpenseListSkeleton';
 import { useTheme, Theme } from '../../lib/theme';
 import { useDashboardStore } from '../../store/dashboardStore';
 import { useFamilyGroup } from '../../hooks/useFamilyGroup';
+import { useAuthStore } from '../../store/authStore';
 
 type ListItem =
   | { type: 'header'; monthKey: string; label: string; total: number }
@@ -22,6 +23,7 @@ export default function ExpensesScreen() {
   const theme = useTheme();
   const styles = createStyles(theme);
   const router = useRouter();
+  const { user } = useAuthStore();
 
   const { viewMode: storedViewMode, setViewMode } = useDashboardStore();
   const { data: group } = useFamilyGroup();
@@ -263,11 +265,12 @@ export default function ExpensesScreen() {
                 </View>
               );
             }
+            const isItemOwner = item.data.user_id === user?.id;
             return (
               <ExpenseRow
                 expense={item.data}
                 onPress={() => setSelectedExpense(item.data)}
-                onLongPress={() => confirmDelete(item.data.id, item.data.merchant)}
+                onLongPress={isItemOwner ? () => confirmDelete(item.data.id, item.data.merchant) : undefined}
               />
             );
           }}
@@ -278,8 +281,17 @@ export default function ExpensesScreen() {
       <ExpenseDetailSheet
         expense={selectedExpense}
         onClose={() => setSelectedExpense(null)}
-        onEdit={(id) => { setSelectedExpense(null); router.push(`/edit-expense?id=${id}`); }}
-        onDelete={(id, merchant) => confirmDelete(id, merchant)}
+        onEdit={(id) => {
+          if (selectedExpense?.user_id === user?.id) {
+            setSelectedExpense(null);
+            router.push(`/edit-expense?id=${id}`);
+          }
+        }}
+        onDelete={(id, merchant) => {
+          if (selectedExpense?.user_id === user?.id) {
+            confirmDelete(id, merchant);
+          }
+        }}
       />
 
       {/* Filter Modal */}

@@ -6,6 +6,7 @@ import { useUserCategories } from '../hooks/useUserCategories';
 import { formatAmount } from '../lib/currency';
 import { useTheme, Theme } from '../lib/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '../store/authStore';
 
 interface Props { expenses: Expense[]; }
 
@@ -13,6 +14,7 @@ export default function RecentExpenses({ expenses }: Props) {
     const theme = useTheme();
     const styles = createStyles(theme);
     const router = useRouter();
+    const { user } = useAuthStore();
     const { getCategoryMeta } = useUserCategories();
 
     return (
@@ -29,8 +31,18 @@ export default function RecentExpenses({ expenses }: Props) {
                 expenses.map(e => {
                     const cat = getCategoryMeta(e.category);
                     const memberName = (e as any).member_name;
+                    const isOwner = e.user_id === user?.id;
                     return (
-                        <TouchableOpacity key={e.id} style={styles.row} onPress={() => router.push(`/edit-expense?id=${e.id}`)}>
+                        <TouchableOpacity
+                            key={e.id}
+                            style={styles.row}
+                            activeOpacity={isOwner ? 0.7 : 1}
+                            onPress={() => {
+                                if (isOwner) {
+                                    router.push(`/edit-expense?id=${e.id}`);
+                                }
+                            }}
+                        >
                             <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
                                 <Ionicons name={cat.icon as any} size={18} color={cat.color} />
                             </View>

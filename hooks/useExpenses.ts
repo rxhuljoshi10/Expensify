@@ -91,6 +91,7 @@ export const useAddExpense = () => {
 
 // ── Update an existing expense ───────────────────────────────────────
 export const useUpdateExpense = () => {
+    const { user } = useAuthStore();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -99,17 +100,22 @@ export const useUpdateExpense = () => {
                 .from('expenses')
                 .update(input)
                 .eq('id', id)
+                .eq('user_id', user!.id)
                 .select()
                 .single();
             if (error) throw error;
             return data;
         },
-        onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+            queryClient.invalidateQueries({ queryKey: GROUP_QUERY_KEY });
+        },
     });
 };
 
 // ── Delete an expense ────────────────────────────────────────────────
 export const useDeleteExpense = () => {
+    const { user } = useAuthStore();
     const queryClient = useQueryClient();
 
     return useMutation({
@@ -117,7 +123,8 @@ export const useDeleteExpense = () => {
             const { error } = await supabase
                 .from('expenses')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('user_id', user!.id);
             if (error) throw error;
         },
         onMutate: async (id) => {
@@ -131,7 +138,10 @@ export const useDeleteExpense = () => {
         onError: (_err, _vars, ctx) => {
             queryClient.setQueryData(QUERY_KEY, ctx?.previous);
         },
-        onSettled: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+            queryClient.invalidateQueries({ queryKey: GROUP_QUERY_KEY });
+        },
     });
 };
 
@@ -212,30 +222,49 @@ export const useGroupExpenses = (isGroupView: boolean = true) => {
           return b.created_at.localeCompare(a.created_at);
         });
 
+      // Fetch public profiles for all group participant user IDs to resolve real names
+      const participantUserIds = Array.from(
+        new Set([group.owner_id, ...(group.members?.map(m => m.user_id) ?? [])])
+      );
+
+      const { data: userProfiles } = await supabase
+        .from('users')
+        .select('id, name, email')
+        .in('id', participantUserIds);
+
+      const profileMap = new Map<string, { name: string; email: string }>();
+      (userProfiles ?? []).forEach(p => {
+        profileMap.set(p.id, { name: p.name ?? '', email: p.email ?? '' });
+      });
+
       return allExpenses.map(e => {
-        const isOwner = e.user_id === group.owner_id;
         const isSelf = e.user_id === user?.id;
 
         let mName = '';
 
         if (isSelf) {
-            // Guarantee perfect sync: if the expense belongs to the local user, use their exact live auth metadata.
-            mName = user?.user_metadata?.full_name ?? '';
+            // Guarantee perfect sync: if the expense belongs to local user, use live auth metadata if present
+            mName = user?.user_metadata?.full_name ?? profileMap.get(e.user_id)?.name ?? '';
         }
 
         if (!mName) {
-            const member = group.members?.find(m => m.user_id === e.user_id);
-            mName = member?.name ?? '';
-
-            if (!mName || mName.trim() === '') {
-                if (member?.email) {
+            const profile = profileMap.get(e.user_id);
+            if (profile?.name && profile.name.trim()) {
+                mName = profile.name.trim();
+            } else if (profile?.email && profile.email.trim()) {
+                mName = profile.email.split('@')[0];
+            } else {
+                const member = group.members?.find(m => m.user_id === e.user_id);
+                if (member?.name && member.name.trim()) {
+                    mName = member.name.trim();
+                } else if (member?.email) {
                     mName = member.email.split('@')[0];
-                } else if (isOwner) {
-                    mName = group.name + ' Owner';
-                } else {
-                    mName = 'Group Member';
                 }
             }
+        }
+
+        if (!mName) {
+            mName = 'Member';
         }
 
         if (isSelf && !mName.includes('(You)')) {

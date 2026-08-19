@@ -12,6 +12,7 @@ import { Expense, ExpenseItem } from '../types/expense';
 import { useUserCategories } from '../hooks/useUserCategories';
 import { formatAmount } from '../lib/currency';
 import { getReceiptSignedUrl } from '../lib/storage';
+import { useAuthStore } from '../store/authStore';
 
 interface Props {
     expense: Expense | null;
@@ -23,7 +24,10 @@ interface Props {
 export default function ExpenseDetailSheet({ expense, onClose, onEdit, onDelete }: Props) {
     const theme = useTheme();
     const styles = createStyles(theme);
+    const { user } = useAuthStore();
     const { getCategoryMeta } = useUserCategories();
+
+    const isExpenseOwner = expense?.user_id === user?.id;
 
     // Track sheet height to dynamically slide down by the right amount
     const sheetHeight = useRef(700);
@@ -234,23 +238,25 @@ export default function ExpenseDetailSheet({ expense, onClose, onEdit, onDelete 
                         </View>
                     )}
 
-                    {/* ── Actions ── */}
-                    <View style={styles.actions}>
-                        <TouchableOpacity
-                            style={styles.editBtn}
-                            onPress={() => { handleClose(); onEdit(expense.id); }}
-                        >
-                            <Ionicons name="pencil-outline" size={18} color={theme.primary} />
-                            <Text style={styles.editBtnText}>Edit</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.deleteBtn}
-                            onPress={() => { handleClose(); onDelete(expense.id, expense.merchant); }}
-                        >
-                            <Ionicons name="trash-outline" size={18} color={theme.danger} />
-                            <Text style={styles.deleteBtnText}>Delete</Text>
-                        </TouchableOpacity>
-                    </View>
+                    {/* ── Actions (only for expense owner) ── */}
+                    {isExpenseOwner && (
+                        <View style={styles.actions}>
+                            <TouchableOpacity
+                                style={styles.editBtn}
+                                onPress={() => { handleClose(); onEdit(expense.id); }}
+                            >
+                                <Ionicons name="pencil-outline" size={18} color={theme.primary} />
+                                <Text style={styles.editBtnText}>Edit</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.deleteBtn}
+                                onPress={() => { handleClose(); onDelete(expense.id, expense.merchant); }}
+                            >
+                                <Ionicons name="trash-outline" size={18} color={theme.danger} />
+                                <Text style={styles.deleteBtnText}>Delete</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </ScrollView>
             </Animated.View>
 

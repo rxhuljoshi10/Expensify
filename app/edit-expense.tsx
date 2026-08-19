@@ -61,6 +61,11 @@ export default function EditExpenseScreen() {
 
     useEffect(() => {
         if (expense) {
+            if (expense.user_id !== user?.id) {
+                toast.error('You can only edit your own expenses');
+                router.back();
+                return;
+            }
             setAmount(String(expense.amount / 100));
             setMerchant(expense.merchant);
             setDescription(expense.description ?? '');
@@ -74,10 +79,10 @@ export default function EditExpenseScreen() {
             }
             setEditItems((expense.items ?? []) as ExpenseItem[]);
         }
-    }, [expense]);
+    }, [expense, user?.id]);
 
-    if (!expense) {
-        return <View style={styles.centered}><Text style={{ color: theme.text }}>Expense not found</Text></View>;
+    if (!expense || expense.user_id !== user?.id) {
+        return <View style={styles.centered}><Text style={{ color: theme.text }}>Expense not found or unauthorized</Text></View>;
     }
 
     const handlePickNewAttachment = async () => {

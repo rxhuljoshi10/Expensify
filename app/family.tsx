@@ -59,7 +59,7 @@ export default function FamilyScreen() {
                 if (data) {
                     // Use email username as fallback if name is null/empty
                     setOwnerProfile({
-                        name: data.name?.trim() || data.email?.split('@')[0] || 'Admin',
+                        name: data.name?.trim() || data.email?.split('@')[0] || 'Owner',
                         email: data.email ?? '',
                     });
                 }
@@ -203,12 +203,12 @@ export default function FamilyScreen() {
                         <Text style={styles.avatarText}>
                             {isOwner
                                 ? (user?.user_metadata?.full_name?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()
-                                : (ownerProfile?.name?.[0] ?? 'A').toUpperCase()}
+                                : (ownerProfile?.name?.[0] ?? 'O').toUpperCase()}
                         </Text>
                     </View>
                     <View style={styles.memberInfo}>
                         <Text style={styles.memberName} numberOfLines={1}>
-                            {isOwner ? 'You' : (ownerProfile?.name || 'Group Admin')}
+                            {isOwner ? 'You' : (ownerProfile?.name || 'Owner')}
                         </Text>
                         <Text style={styles.memberRole}>
                             {isOwner ? user?.email : ownerProfile?.email ?? ''}
