@@ -23,6 +23,7 @@ import {
     deleteReceiptAttachment,
 } from '../lib/storage';
 import { useAuthStore } from '../store/authStore';
+import { requestMediaLibraryPermission } from '../lib/permissions';
 
 export default function EditExpenseScreen() {
     const theme = useTheme();
@@ -86,11 +87,8 @@ export default function EditExpenseScreen() {
     }
 
     const handlePickNewAttachment = async () => {
-        const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!granted) {
-            toast.error('Photo library permission is required to attach receipt');
-            return;
-        }
+        const granted = await requestMediaLibraryPermission();
+        if (!granted) return;
 
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,

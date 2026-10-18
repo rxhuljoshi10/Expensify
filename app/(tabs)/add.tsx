@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { uploadReceiptAttachment } from '../../lib/storage';
 import { useAuthStore } from '../../store/authStore';
+import { requestMediaLibraryPermission } from '../../lib/permissions';
 
 export default function AddExpenseScreen() {
     const theme = useTheme();
@@ -254,11 +255,8 @@ export default function AddExpenseScreen() {
 
     // Manually pick a photo from camera/gallery to attach
     const handlePickAttachment = async () => {
-        const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!granted) {
-            toast.error('Photo library permission is required to attach receipt');
-            return;
-        }
+        const granted = await requestMediaLibraryPermission();
+        if (!granted) return;
 
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -315,11 +313,7 @@ export default function AddExpenseScreen() {
                             <Text style={styles.quickTitle}>{isScanning ? 'Scanning...' : 'Scan Receipt'}</Text>
                             <Text style={styles.quickSub}>{isScanning ? 'AI processing...' : 'Auto-fill from photo'}</Text>
                         </View>
-                        {isScanning ? (
-                            <ActivityIndicator size="small" color={theme.primary} />
-                        ) : (
-                            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
-                        )}
+                        <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
@@ -336,6 +330,17 @@ export default function AddExpenseScreen() {
                         </View>
                     </TouchableOpacity>
                 </View>
+
+                {/* ── Prominent Scanning Status Banner ── */}
+                {isScanning && (
+                    <View style={styles.scanningBanner}>
+                        <ActivityIndicator size="small" color="#fff" />
+                        <View style={{ marginLeft: 12, flex: 1 }}>
+                            <Text style={styles.scanningBannerTitle}>Scanning receipt with AI...</Text>
+                            <Text style={styles.scanningBannerSubtitle}>Gemini AI is extracting merchant, items & total</Text>
+                        </View>
+                    </View>
+                )}
 
                 <Text style={styles.label}>Amount (₹)</Text>
                 <TextInput
@@ -621,6 +626,31 @@ function createStyles(theme: Theme) {
         },
         quickTitle: { fontSize: 14, fontWeight: '700', color: theme.text },
         quickSub: { fontSize: 11, color: theme.textSecondary, marginTop: 1 },
+
+        // Prominent Scanning Banner
+        scanningBanner: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: theme.primary,
+            padding: 14,
+            borderRadius: 14,
+            marginBottom: 16,
+            shadowColor: theme.primary,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            elevation: 4,
+        },
+        scanningBannerTitle: {
+            color: '#fff',
+            fontSize: 14,
+            fontWeight: '700',
+        },
+        scanningBannerSubtitle: {
+            color: 'rgba(255, 255, 255, 0.85)',
+            fontSize: 12,
+            marginTop: 2,
+        },
 
         label: { fontSize: 13, color: theme.textSecondary, marginBottom: 6, marginTop: 16 },
         amountInput: { fontSize: 40, fontWeight: '700', color: theme.text, borderBottomWidth: 2, borderColor: theme.primary, paddingBottom: 8 },

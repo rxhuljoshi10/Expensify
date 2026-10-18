@@ -4,6 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Alert } from 'react-native';
 import { ExpenseItem } from '../types/expense';
+import { requestCameraPermission, requestMediaLibraryPermission } from './permissions';
 
 export const parseVoiceExpense = async (audioUri: string, categories?: string[]): Promise<{
   transcript: string;
@@ -98,23 +99,11 @@ export const pickAndScanBill = async (categories?: string[], onScanStart?: () =>
     if (choice === 'cancel') return null;
 
     if (choice === 'camera') {
-      const { granted } = await ImagePicker.requestCameraPermissionsAsync();
-      if (!granted) {
-        Alert.alert(
-          'Camera Permission Required',
-          'Expensify needs camera permission to scan bills and receipts. Please enable camera access in your device settings.'
-        );
-        return null;
-      }
+      const granted = await requestCameraPermission();
+      if (!granted) return null;
     } else {
-      const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!granted) {
-        Alert.alert(
-          'Photo Library Permission Required',
-          'Expensify needs photo library permission to select receipts. Please enable photo access in your device settings.'
-        );
-        return null;
-      }
+      const granted = await requestMediaLibraryPermission();
+      if (!granted) return null;
     }
 
     const pickerOptions: ImagePicker.ImagePickerOptions = {
@@ -129,7 +118,8 @@ export const pickAndScanBill = async (categories?: string[], onScanStart?: () =>
 
     if (result.canceled) return null;
 
-    console.log("Image selected successfully")
+    console.log("Image selected successfully");
+    onScanStart?.();
 
     // Compress to ~600KB — enough for Vision to read clearly
     const compressed = await ImageManipulator.manipulateAsync(

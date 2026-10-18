@@ -6,7 +6,8 @@ node_modules/
 .env
 *-firebase-*.json
 service-account*.json
-
+*.apk
+devInfo.private
 
 # Expo
 .expo/

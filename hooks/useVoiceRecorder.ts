@@ -1,12 +1,11 @@
-// hooks/useVoiceRecorder.ts
 import { useState } from 'react';
 import {
   AudioQuality,
   IOSOutputFormat,
-  requestRecordingPermissionsAsync,
   useAudioRecorder,
 } from "expo-audio";
-import { Platform, Alert } from "react-native";
+import { Platform } from "react-native";
+import { requestMicrophonePermission } from '../lib/permissions';
 
 export type RecorderState = 'idle' | 'recording' | 'processing' | 'done' | 'error';
 
@@ -62,12 +61,8 @@ export const useVoiceRecorder = () => {
 
   const startRecording = async () => {
     try {
-      const { granted } = await requestRecordingPermissionsAsync();
+      const granted = await requestMicrophonePermission();
       if (!granted) {
-        Alert.alert(
-          'Microphone Permission Required',
-          'Expensify needs microphone permission to record voice expenses. Please enable microphone access in your device settings.'
-        );
         setErrorMessage('Microphone permission denied');
         setState('error');
         return;

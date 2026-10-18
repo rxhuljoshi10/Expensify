@@ -40,7 +40,7 @@ async function promptBackgroundPermissionsIfNeeded(): Promise<void> {
             '📱 Enable AutoStart',
             'For reliable SMS expense detection when your phone is idle, please enable AutoStart for Expensify.\n\nThis is required on Xiaomi, Oppo, Vivo, Realme, and similar devices.',
             [
-              { text: 'Skip', style: 'cancel', onPress: resolve },
+              { text: 'Skip', style: 'cancel', onPress: () => resolve() },
               {
                 text: 'Open Settings',
                 onPress: () => {
