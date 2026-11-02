@@ -67,7 +67,51 @@ object NativeSmsProcessor {
     )
 
     private val CURRENCY_PATTERN = Regex("""(?:Rs\\.?|₹|INR)\\s*[\\d,.]+""", RegexOption.IGNORE_CASE)
-    private val AMOUNT_PATTERN = Regex("""(?:Rs\\.?|₹|INR)\\s*([\\d,]+(?:\\.\\d{1,2})?)""", RegexOption.IGNORE_CASE)
+    // Multi-bank amount extraction — specific patterns before generic fallback
+    private val AMOUNT_PATTERNS = listOf(
+        Regex("""[Ss]ent\\s+Rs\.?\\s*([\\d,]+(?:\.\\d{1,2})?)"""),
+        Regex("""INR\\s+([\\d,]+(?:\.\\d{1,2})?)\\s+debited""", RegexOption.IGNORE_CASE),
+        Regex("""debited\\s+for\\s+Rs\.?\\s*([\\d,]+(?:\.\\d{1,2})?)""", RegexOption.IGNORE_CASE),
+        Regex("""debited\\s+INR\\s+([\\d,]+(?:\.\\d{1,2})?)""", RegexOption.IGNORE_CASE),
+        Regex("""(?:Rs\.?|₹|INR)\\s*([\\d,]+(?:\.\\d{1,2})?)""", RegexOption.IGNORE_CASE)
+    )
+
+    // UPI transaction reference number patterns
+    private val UPI_REF_PATTERNS = listOf(
+        Regex("""UPI\\s+Ref\\s+(\\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""UPI/P2[MA]/(\\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""UPI:(\\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""UPI[:/s]+(\\d{10,})""", RegexOption.IGNORE_CASE)
+    )
+
+    // Recipient name extraction — Kotak, PNB, ICICI, Axis UPI path
+    private val RECIPIENT_PATTERNS = listOf(
+        Regex("""\\bto\\s+(.+?)\\s+on\\s+\\d{1,2}[-/]""", RegexOption.IGNORE_CASE),
+        Regex("""\\bto\\s+(.+?)\\s+thru\\s+UPI""", RegexOption.IGNORE_CASE),
+        Regex(""";\\s*(.+?)\\s+credited""", RegexOption.IGNORE_CASE),
+        Regex("""UPI/P2[MA]/\\d+/(.+?)(?=\\s+(?:Not\\s+you|SMS\\s+BLOCK|\\d{2}-\\d{2})|\\z)""", RegexOption.IGNORE_CASE)
+    )
+
+    private val MERCHANT_KEYWORDS = setOf(
+        "SHOP", "STORE", "MART", "DAIRY", "MEDICAL", "TRADERS", "TRADING",
+        "ENTERPRISES", "ENTERPRISE", "SERVICES", "SERVICE", "FOODS", "FOOD",
+        "RESTAURANT", "CAFE", "HOTEL", "PHARMACY", "HOSPITAL", "CLINIC",
+        "PETROL", "FUEL", "MOTORS", "ELECTRONICS", "MOBILE", "TELECOM",
+        "MARKET", "BAZAAR", "AGENCIES", "AGENCY", "ASSOCIATES", "INDUSTRIES",
+        "HOUSE", "CENTRE", "CENTER", "VENDORS", "SUPPLIER", "WHOLESALE",
+        "RETAIL", "SHO", "SHOPPE", "EMPORIUM", "COLLECTIONS", "FASHIONS",
+        "HARDWARE", "AUTO", "GENERAL", "JEWELLERS", "JEWELS", "OPTICAL"
+    )
+
+    private val KNOWN_BRANDS = setOf(
+        "SWIGGY", "ZOMATO", "AMAZON", "FLIPKART", "MEESHO", "MYNTRA", "NYKAA",
+        "AJIO", "BLINKIT", "ZEPTO", "INSTAMART", "DUNZO", "BIGBASKET",
+        "OLA", "UBER", "RAPIDO", "IRCTC", "MAKEMYTRIP", "GOIBIBO", "REDBUS",
+        "NETFLIX", "HOTSTAR", "JIOCINEMA", "SPOTIFY", "UIDAI", "EPFO",
+        "PAYTM", "PHONEPE", "GPAY", "GOOGLEPAY", "CRED", "GROWW", "ZERODHA",
+        "AIRTEL", "JIO", "BSNL", "VODAFONE", "IDEA"
+    )
+
     private val VPA_PATTERN = Regex("""(?:to\\s+)?([a-zA-Z0-9._-]+@[a-zA-Z0-9]+)""", RegexOption.IGNORE_CASE)
     private val NUM_DATE_PATTERN = Regex("""(\\d{1,2})[-/](\\d{1,2})[-/](\\d{2,4})""")
     private val MON_DATE_PATTERN = Regex("""(\\d{1,2})[-/]([A-Za-z]{3})[-/](\\d{2,4})""")
@@ -89,15 +133,18 @@ object NativeSmsProcessor {
                 return
             }
 
-            val fields = extractBasicFields(smsBody)
+            val fields = extractSmsFields(smsBody)
             if (fields == null) {
                 Log.d(TAG, "NativeSmsProcessor: could not extract fields, skipping")
                 return
             }
 
-            val dedupKey = "\${fields.amount}|\${fields.date ?: "unknown"}|\${(fields.vpa ?: "unknown").lowercase()}"
+            // Prefer UPI ref (globally unique) for dedup; fall back to amount+date+name
+            val dedupKey = if (fields.upiRef != null) "upi:" + fields.upiRef
+                           else fields.amount.toString() + "|" + (fields.date ?: "unknown") + "|" +
+                                (fields.recipientName ?: fields.vpa ?: "unknown").lowercase()
             if (isDuplicate(context, dedupKey)) {
-                Log.d(TAG, "NativeSmsProcessor: duplicate SMS, skipping")
+                Log.d(TAG, "NativeSmsProcessor: duplicate SMS, skipping. Key: " + dedupKey)
                 return
             }
 
@@ -110,114 +157,38 @@ object NativeSmsProcessor {
             val dateStr = fields.date ?: SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
             val amountPaise = Math.round(fields.amount * 100)
 
-            if (fields.vpa == null) {
-                val saved = saveExpenseToSupabase(
-                    context = context,
-                    session = session,
-                    amount = amountPaise,
-                    merchant = "Unknown Merchant",
-                    category = "Other",
-                    expenseDate = dateStr
+            // Resolve merchant name: prefer extracted name, fall back to VPA-derived name
+            val merchantName = fields.recipientName
+                ?: fields.vpa?.let { vpa ->
+                    val cls = classifyVpa(vpa)
+                    formatMerchantFromVpa(cls.handle, cls.type)
+                }
+                ?: "Unknown Merchant"
+
+            // Classify: UPI path type first, then name heuristics, then VPA type fallback
+            val isPersonal = classifyRecipient(fields.recipientName, fields.vpaType) == "personal" ||
+                (fields.recipientName == null && fields.vpa != null && classifyVpa(fields.vpa).type == "personal")
+            val category = if (isPersonal) "Personal" else "Other"
+
+            Log.d(TAG, "NativeSmsProcessor: saving " + formatRupees(fields.amount) + " at " + merchantName + " (" + category + ")")
+
+            val saved = saveExpenseToSupabase(
+                context = context,
+                session = session,
+                amount = amountPaise,
+                merchant = merchantName,
+                category = category,
+                expenseDate = dateStr
+            )
+
+            if (saved) {
+                val prep = if (isPersonal) "to" else "at"
+                showNotification(
+                    context,
+                    title = "Expense Saved",
+                    body = formatRupees(fields.amount) + " " + prep + " " + merchantName + " (" + category + ")",
+                    targetScreen = "expenses"
                 )
-                if (saved) {
-                    showNotification(
-                        context,
-                        title = "Expense Saved",
-                        body = "\${formatRupees(fields.amount)} — Unknown merchant (Other)",
-                        targetScreen = "expenses"
-                    )
-                }
-                return
-            }
-
-            val classification = classifyVpa(fields.vpa)
-
-            when (classification.type) {
-                "personal" -> {
-                    val displayName = formatMerchantFromVpa(classification.handle, "personal")
-                    val saved = saveExpenseToSupabase(
-                        context = context,
-                        session = session,
-                        amount = amountPaise,
-                        merchant = displayName,
-                        category = "Personal",
-                        expenseDate = dateStr
-                    )
-                    if (saved) {
-                        showNotification(
-                            context,
-                            title = "Expense Saved",
-                            body = "\${formatRupees(fields.amount)} to \$displayName (Personal)",
-                            targetScreen = "expenses"
-                        )
-                    }
-                }
-
-                "brand" -> {
-                    val displayName = formatMerchantFromVpa(classification.handle, "brand")
-                    val saved = saveExpenseToSupabase(
-                        context = context,
-                        session = session,
-                        amount = amountPaise,
-                        merchant = displayName,
-                        category = "Other",
-                        expenseDate = dateStr
-                    )
-                    if (saved) {
-                        showNotification(
-                            context,
-                            title = "Expense Saved",
-                            body = "\${formatRupees(fields.amount)} at \$displayName (Other)",
-                            targetScreen = "expenses"
-                        )
-                    }
-                }
-
-                "dynamic_qr" -> {
-                    val mapping = lookupMerchantMapping(
-                        context = context,
-                        session = session,
-                        rawVpa = classification.raw
-                    )
-
-                    if (mapping != null) {
-                        val saved = saveExpenseToSupabase(
-                            context = context,
-                            session = session,
-                            amount = amountPaise,
-                            merchant = mapping.friendlyName,
-                            category = mapping.category,
-                            expenseDate = dateStr
-                        )
-                        if (saved) {
-                            showNotification(
-                                context,
-                                title = "Expense Saved",
-                                body = "\${formatRupees(fields.amount)} at \${mapping.friendlyName} (\${mapping.category})",
-                                targetScreen = "expenses"
-                            )
-                        }
-                    } else {
-                        val savedPending = savePendingExpenseToSupabase(
-                            context = context,
-                            session = session,
-                            rawSms = smsBody,
-                            amount = amountPaise,
-                            rawVpa = classification.raw,
-                            vpaType = "dynamic_qr",
-                            parsedDate = dateStr
-                        )
-                        if (savedPending) {
-                            val displayName = formatMerchantFromVpa(classification.handle, "dynamic_qr")
-                            showPendingNotification(
-                                context,
-                                session,
-                                fields.amount,
-                                displayName
-                            )
-                        }
-                    }
-                }
             }
 
         } catch (e: Exception) {
@@ -235,41 +206,72 @@ object NativeSmsProcessor {
     data class SmsFields(
         val amount: Double,
         val vpa: String?,
-        val date: String?
+        val date: String?,
+        val recipientName: String?,
+        val upiRef: String?,
+        val vpaType: String?
     )
 
-    private fun extractBasicFields(body: String): SmsFields? {
-        val amountMatch = AMOUNT_PATTERN.find(body) ?: return null
-        val amountStr = amountMatch.groupValues[1].replace(",", "")
-        val amount = amountStr.toDoubleOrNull() ?: return null
-        if (amount <= 0) return null
+    private fun extractSmsFields(rawBody: String): SmsFields? {
+        // Normalize: collapse newlines and multiple spaces so patterns work across line breaks
+        val body = rawBody.replace(Regex("""[\\r\\n\\t]+"""), " ").replace(Regex("""\\s{2,}"""), " ").trim()
 
-        val vpaMatch = VPA_PATTERN.find(body)
-        val vpa = vpaMatch?.groupValues?.get(1)?.trimEnd('.', ',')
+        // Amount extraction — try specific patterns before generic fallback
+        var amount: Double? = null
+        for (pat in AMOUNT_PATTERNS) {
+            val m = pat.find(body) ?: continue
+            val v = m.groupValues[1].replace(",", "").toDoubleOrNull() ?: continue
+            if (v > 0) { amount = v; break }
+        }
+        if (amount == null) return null
 
+        // UPI reference number
+        var upiRef: String? = null
+        for (pat in UPI_REF_PATTERNS) {
+            val m = pat.find(body) ?: continue
+            upiRef = m.groupValues[1]; break
+        }
+
+        // Recipient name
+        var recipientName: String? = null
+        for (pat in RECIPIENT_PATTERNS) {
+            val m = pat.find(body) ?: continue
+            val r = m.groupValues[1].trim().replace(Regex("""\\s+"""), " ")
+            if (r.isNotEmpty() && r.length < 80) { recipientName = r; break }
+        }
+
+        // Legacy VPA (backward compat for old-format SMS that still have @)
+        val vpa = VPA_PATTERN.find(rawBody)?.groupValues?.get(1)?.trimEnd('.', ',')
+
+        // Date extraction
         var date: String? = null
-
         val numDateMatch = NUM_DATE_PATTERN.find(body)
         if (numDateMatch != null) {
             val day = numDateMatch.groupValues[1].padStart(2, '0')
             val month = numDateMatch.groupValues[2].padStart(2, '0')
             var year = numDateMatch.groupValues[3]
-            if (year.length == 2) year = "20$year"
-            date = "$year-$month-$day"
+            if (year.length == 2) year = "20" + year
+            date = year + "-" + month + "-" + day
         }
-
         if (date == null) {
             val monDateMatch = MON_DATE_PATTERN.find(body)
             if (monDateMatch != null) {
                 val day = monDateMatch.groupValues[1].padStart(2, '0')
                 val mon = MONTH_MAP[monDateMatch.groupValues[2].lowercase()] ?: "01"
                 var year = monDateMatch.groupValues[3]
-                if (year.length == 2) year = "20$year"
-                date = "$year-$mon-$day"
+                if (year.length == 2) year = "20" + year
+                date = year + "-" + mon + "-" + day
             }
         }
 
-        return SmsFields(amount, vpa, date)
+        // VPA type from UPI path (most reliable signal: P2M = merchant, P2A = personal)
+        val vpaType = when {
+            Regex("UPI/P2M/", RegexOption.IGNORE_CASE).containsMatchIn(body) -> "P2M"
+            Regex("UPI/P2A/", RegexOption.IGNORE_CASE).containsMatchIn(body) -> "P2A"
+            else -> null
+        }
+
+        return SmsFields(amount, vpa, date, recipientName, upiRef, vpaType)
     }
 
     data class VpaClassification(
@@ -330,6 +332,25 @@ object NativeSmsProcessor {
             }
             else -> handle.replaceFirstChar { it.uppercase() }
         }
+    }
+
+    /**
+     * Classify recipient as personal (P2P) or merchant.
+     * Priority: UPI path type (P2M/P2A) > known brands > merchant keywords > name heuristic
+     */
+    private fun classifyRecipient(name: String?, vpaType: String?): String {
+        if (vpaType == "P2M") return "merchant"
+        if (vpaType == "P2A") return "personal"
+        if (name == null) return "merchant"
+
+        val upper = name.trim().uppercase()
+        val words = upper.split(Regex("""\\s+""")).filter { it.isNotEmpty() }
+
+        if (KNOWN_BRANDS.contains(upper) || (words.size == 1 && KNOWN_BRANDS.contains(words[0]))) return "merchant"
+        if (words.any { MERCHANT_KEYWORDS.contains(it) }) return "merchant"
+        // Human name heuristic: 2-4 all-alpha words (handles initials like "RAHUL SANTOSH J")
+        if (words.size in 2..4 && words.all { it.matches(Regex("[A-Z]+")) }) return "personal"
+        return "merchant"
     }
 
     private fun isDuplicate(context: Context, key: String): Boolean {

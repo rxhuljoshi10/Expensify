@@ -24,6 +24,7 @@ import {
   getInitialNotificationRoute,
 } from '../lib/notifications';
 import { useSmsSync } from '../hooks/useSmsSync';
+import { useDrainCategorizationQueue } from '../hooks/useExpenses';
 
 import AnimatedSplashScreen from '../components/AnimatedSplashScreen';
 
@@ -34,6 +35,7 @@ function AuthGuard() {
   const router = useRouter();
   const theme = useTheme();
   const { triggerGeneration, isGenerating } = useInsightStore();
+  const { drain: drainCategorizationQueue } = useDrainCategorizationQueue();
 
   useEffect(() => {
     loadSettings();
@@ -102,6 +104,14 @@ function AuthGuard() {
       { id, name: fullName, email: email ?? '' },
       { onConflict: 'id' }
     );
+  }, [session?.user?.id]);
+
+  // Drain any failed-offline categorizations — one retry per queued expense
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    // Small delay to let categories load before we try to categorize
+    const t = setTimeout(() => drainCategorizationQueue(), 3000);
+    return () => clearTimeout(t);
   }, [session?.user?.id]);
 
   useEffect(() => {

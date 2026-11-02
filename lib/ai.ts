@@ -5,6 +5,42 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { Alert } from 'react-native';
 import { ExpenseItem } from '../types/expense';
 import { requestCameraPermission, requestMediaLibraryPermission } from './permissions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ── Pending-categorization retry queue ─────────────────────────────────────────
+// Expenses that failed LLM categorization (offline / network error) are
+// stored here.  On next app open / network return, the caller retries once.
+export const CATEGORIZE_QUEUE_KEY = '@categorize_retry_queue';
+
+export interface PendingCategorizationItem {
+    expenseId: string;
+    hint: string;        // spentOn text to categorize
+    categories: string[];
+}
+
+export const enqueuePendingCategorization = async (item: PendingCategorizationItem): Promise<void> => {
+    try {
+        const raw = await AsyncStorage.getItem(CATEGORIZE_QUEUE_KEY);
+        const queue: PendingCategorizationItem[] = raw ? JSON.parse(raw) : [];
+        // Avoid duplicates: if this expenseId is already queued, replace it
+        const deduped = queue.filter(q => q.expenseId !== item.expenseId);
+        deduped.push(item);
+        await AsyncStorage.setItem(CATEGORIZE_QUEUE_KEY, JSON.stringify(deduped));
+    } catch (e) {
+        console.error('[categorize] Failed to enqueue pending item:', e);
+    }
+};
+
+export const dequeuePendingCategorizations = async (): Promise<PendingCategorizationItem[]> => {
+    try {
+        const raw = await AsyncStorage.getItem(CATEGORIZE_QUEUE_KEY);
+        if (!raw) return [];
+        await AsyncStorage.removeItem(CATEGORIZE_QUEUE_KEY);
+        return JSON.parse(raw);
+    } catch {
+        return [];
+    }
+};
 
 export const parseVoiceExpense = async (audioUri: string, categories?: string[]): Promise<{
   transcript: string;
@@ -53,19 +89,60 @@ export const parseVoiceExpense = async (audioUri: string, categories?: string[])
   }
 };
 
+/**
+ * Categorize an expense given a hint text (spentOn) or merchant name.
+ * The edge function receives it as `merchant` for backward compatibility.
+ * Change 5 note: when spentOn is absent and merchant is present, pass merchant as hint.
+ */
 export const categorizeExpense = async (
-  merchant: string,
+  hint: string,          // spentOn (primary) — or merchant name as fallback
   description?: string,
   categories?: string[],
 ): Promise<string> => {
   try {
     const { data, error } = await supabase.functions.invoke('categorize-expense', {
-      body: { merchant, description, categories },
+      body: { merchant: hint, description, categories },
     });
     if (error) throw error;
     return data.category ?? 'Other';
   } catch {
     return 'Other';  // always fall back silently
+  }
+};
+
+/**
+ * LLM fallback for SMS bodies that local regex patterns couldn't parse.
+ * Calls the 'parse-sms' Supabase edge function (deploy separately).
+ *
+ * Returns null if:
+ *  - The edge function is not deployed yet         ← degrades gracefully
+ *  - The network is unavailable
+ *  - Gemini determines the SMS is not a debit expense
+ *
+ * When the edge function IS deployed, it should return:
+ *  { isExpense: boolean, amount: number, recipientName: string, date: string | null }
+ */
+export const parseSmsWithLLM = async (smsBody: string): Promise<{
+  isExpense: boolean;
+  amount: number;
+  recipientName: string | null;
+  date: string | null;
+} | null> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('parse-sms', {
+      body: { smsBody },
+    });
+    if (error) throw error;
+    if (!data?.isExpense || !data?.amount) return null;
+    return {
+      isExpense: data.isExpense,
+      amount: data.amount,
+      recipientName: data.recipientName ?? null,
+      date: data.date ?? null,
+    };
+  } catch {
+    // Edge function not deployed or network error — silent no-op
+    return null;
   }
 };
 

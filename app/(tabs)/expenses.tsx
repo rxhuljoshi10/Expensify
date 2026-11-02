@@ -79,8 +79,11 @@ export default function ExpensesScreen() {
 
   const filtered = useMemo(() =>
     expenses.filter(e => {
-      const matchesSearch = e.merchant.toLowerCase().includes(search.toLowerCase()) ||
-        (e.description ?? '').toLowerCase().includes(search.toLowerCase());
+      const q = search.toLowerCase();
+      const matchesSearch = !q ||
+        (e.merchant ?? '').toLowerCase().includes(q) ||
+        (e.spent_on ?? '').toLowerCase().includes(q) ||
+        (e.description ?? '').toLowerCase().includes(q);
       const matchesCategory = activeCategory === 'All' || e.category === activeCategory;
       
       let matchesTimeline = true;
@@ -147,8 +150,8 @@ export default function ExpensesScreen() {
     ? timelineOptions.find(o => o.value === activeTimelineOption)?.label
     : null;
 
-  const confirmDelete = (id: string, merchant: string) => {
-    Alert.alert('Delete expense', `Remove "${merchant}"?`, [
+  const confirmDelete = (id: string, label: string) => {
+    Alert.alert('Delete expense', `Remove "${label}"?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteExpense(id) },
     ]);
@@ -266,12 +269,13 @@ export default function ExpensesScreen() {
               );
             }
             const isItemOwner = item.data.user_id === user?.id;
-            return (
-              <ExpenseRow
-                expense={item.data}
-                onPress={() => setSelectedExpense(item.data)}
-                onLongPress={isItemOwner ? () => confirmDelete(item.data.id, item.data.merchant) : undefined}
-              />
+              const longPressLabel = item.data.spent_on?.trim() || item.data.merchant?.trim() || 'expense';
+              return (
+                <ExpenseRow
+                  expense={item.data}
+                  onPress={() => setSelectedExpense(item.data)}
+                  onLongPress={isItemOwner ? () => confirmDelete(item.data.id, longPressLabel) : undefined}
+                />
             );
           }}
         />

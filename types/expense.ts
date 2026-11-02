@@ -1,6 +1,15 @@
 // types/expense.ts
 export type Category = string;
 
+/**
+ * Client-only (never persisted to DB) categorization lifecycle state.
+ * - pending  : saved without a category; background LLM is running
+ * - done     : category was set (by LLM or by user)
+ * - failed   : LLM attempt failed; will retry once on next app open
+ * - user_set : user explicitly chose a category; LLM must never overwrite
+ */
+export type CategorizationStatus = 'pending' | 'done' | 'failed' | 'user_set';
+
 export interface UserCategory {
     id: string;
     user_id: string;
@@ -22,24 +31,30 @@ export interface Expense {
     user_id: string;
     amount: number;        // stored in paise — ₹480 = 48000
     category: Category;
-    merchant: string;
+    merchant?: string;     // optional — brand/shop name (e.g. "Amazon", "DMart")
+    spent_on?: string;     // what the money was for (e.g. "Petrol", "Groceries")
     description?: string;
     expense_date: string;  // 'YYYY-MM-DD'
     created_at: string;
     source?: string;
     attachment_url?: string | null; // path in Supabase Storage (receipt photo)
     items?: ExpenseItem[] | null;   // structured line items from scanned receipt
+    // ── Client-only fields (never sent to DB) ────────────────────────────
+    _categorizationStatus?: CategorizationStatus;
 }
 
 export interface CreateExpenseInput {
     amount: number;        // still in paise
     category: Category;
-    merchant: string;
+    merchant?: string;     // optional
+    spent_on?: string;     // what it was spent on
     description?: string;
     expense_date: string;
     attachment_url?: string | null;
     items?: ExpenseItem[] | null;
     source?: string;
+    // ── Client-only flag (stripped before DB insert) ──────────────────────
+    _userSetCategory?: boolean;
 }
 
 // Add to types/expense.ts

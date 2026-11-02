@@ -32,6 +32,21 @@ export default function RecentExpenses({ expenses }: Props) {
                     const cat = getCategoryMeta(e.category);
                     const memberName = (e as any).member_name;
                     const isOwner = e.user_id === user?.id;
+                    const isPending = e._categorizationStatus === 'pending';
+
+                    // ── Display priority: spentOn → merchant → category ───────────────
+                    const spentOn  = e.spent_on?.trim() || null;
+                    const merchant = e.merchant?.trim() || null;
+                    const catName  = e.category?.trim() || null;
+
+                    const primaryText = spentOn
+                        ?? merchant
+                        ?? catName
+                        ?? (isPending ? 'Categorizing…' : 'Uncategorized');
+
+                    // Muted secondary: merchant shown only when spentOn is the primary
+                    const secondaryMerchant = spentOn && merchant ? merchant : null;
+
                     return (
                         <TouchableOpacity
                             key={e.id}
@@ -44,15 +59,27 @@ export default function RecentExpenses({ expenses }: Props) {
                             }}
                         >
                             <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
-                                <Ionicons name={cat.icon as any} size={18} color={cat.color} />
+                                {isPending
+                                    ? <Ionicons name="hourglass-outline" size={18} color={theme.textSecondary} />
+                                    : <Ionicons name={cat.icon as any} size={18} color={cat.color} />
+                                }
                             </View>
                             <View style={styles.info}>
-                                <Text style={styles.merchant} numberOfLines={1}>{e.merchant}</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                                    <Text style={styles.category}>{e.category}</Text>
+                                <Text
+                                    style={[styles.primary, isPending && styles.primaryPending]}
+                                    numberOfLines={1}
+                                >
+                                    {primaryText}
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 }}>
+                                    {secondaryMerchant && (
+                                        <Text style={styles.secondary} numberOfLines={1}>{secondaryMerchant}</Text>
+                                    )}
+                                    {secondaryMerchant && memberName && (
+                                        <Text style={styles.dotSeparator}>•</Text>
+                                    )}
                                     {memberName && (
                                         <>
-                                            <Text style={styles.dotSeparator}>•</Text>
                                             <Text style={styles.memberBadge}>👤 {memberName}</Text>
                                         </>
                                     )}
@@ -76,10 +103,10 @@ function createStyles(theme: Theme) {
         empty: { color: theme.textSecondary, fontSize: 14, textAlign: 'center', paddingVertical: 16 },
         row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
         iconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-        icon: { fontSize: 18 },
         info: { flex: 1 },
-        merchant: { fontSize: 14, fontWeight: '500', color: theme.text },
-        category: { fontSize: 12, color: theme.textSecondary },
+        primary: { fontSize: 14, fontWeight: '500', color: theme.text },
+        primaryPending: { color: theme.textSecondary, fontStyle: 'italic' },
+        secondary: { fontSize: 12, color: theme.textSecondary, flexShrink: 1 },
         dotSeparator: { fontSize: 10, color: theme.textSecondary, marginHorizontal: 6, marginTop: 1 },
         memberBadge: { fontSize: 11, fontWeight: '500', color: theme.primary, backgroundColor: theme.primary + '11', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
         amount: { fontSize: 14, fontWeight: '600', color: theme.text },

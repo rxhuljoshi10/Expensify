@@ -13,7 +13,7 @@ import CategoryPicker from '../../components/CategoryPicker';
 import { rupeesToPaise } from '../../lib/currency';
 import { Category, ExpenseItem } from '../../types/expense';
 import { useTheme, Theme } from '../../lib/theme';
-import { categorizeExpense, parseVoiceExpense, pickAndScanBill } from '../../lib/ai';
+import { parseVoiceExpense, pickAndScanBill } from '../../lib/ai';
 import { getLocalISODate } from '../../lib/date';
 import { Ionicons } from '@expo/vector-icons';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
@@ -32,15 +32,14 @@ export default function AddExpenseScreen() {
     const { categories, trackCategoryUsage } = useUserCategories();
 
     const [amount, setAmount] = useState('');
-    const [merchant, setMerchant] = useState('');
+    const [spentOn, setSpentOn] = useState('');
     const [description, setDescription] = useState('');
     const [category, setCategory] = useState<string | null>(null);
+    const [userSetCategory, setUserSetCategory] = useState(false); // tracks if user explicitly picked
 
     const [date, setDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
-    const [errors, setErrors] = useState<{ amount?: string; merchant?: string }>({});
-    const [isCategorizing, setIsCategorizing] = useState(false);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    const [errors, setErrors] = useState<{ amount?: string; spentOnOrCategory?: string }>({});
     const [isScanning, setIsScanning] = useState(false);
     const [source, setSource] = useState<string>('manual');
 
@@ -91,8 +90,9 @@ export default function AddExpenseScreen() {
                 // Single expense → pre-fill the form
                 const exp = result.expenses[0];
                 setAmount(String(exp.amount));
-                setMerchant(exp.merchant);
+                setSpentOn(exp.merchant || ''); // voice may return merchant as hint; map to spentOn
                 setCategory(exp.category as Category);
+                setUserSetCategory(true); // voice result includes LLM category — treat as user_set
                 setSource('voice');
                 toast.success('Form filled from voice 🎙️');
                 resetVoice();
@@ -116,7 +116,7 @@ export default function AddExpenseScreen() {
                 multipleExpenses.map(exp =>
                     addExpenseAsync({
                         amount: rupeesToPaise(exp.amount),
-                        merchant: exp.merchant,
+                        spent_on: exp.spentOn || exp.merchant || '',
                         category: exp.category as any,
                         expense_date: today,
                         description: '',
@@ -145,7 +145,10 @@ export default function AddExpenseScreen() {
         const newErrors: typeof errors = {};
         const parsed = parseFloat(amount);
         if (!amount || isNaN(parsed) || parsed <= 0) newErrors.amount = 'Please enter a valid amount';
-        if (!merchant.trim()) newErrors.merchant = 'Merchant name is required';
+        // Require at least spentOn OR category — otherwise there is nothing to display/categorize
+        if (!spentOn.trim() && !category) {
+            newErrors.spentOnOrCategory = 'Add what it was for or pick a category';
+        }
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -155,34 +158,28 @@ export default function AddExpenseScreen() {
         const parsed = parseFloat(amount);
 
         const doSave = async (storagePath: string | null) => {
-            let finalCategory = category;
-            if (!finalCategory) {
-                try {
-                    finalCategory = await categorizeExpense(merchant.trim(), description.trim(), categories.map(c => c.name));
-                } catch {
-                    finalCategory = 'Other';
-                }
-            }
-
             addExpense({
                 amount: rupeesToPaise(parsed),
-                category: finalCategory,
-                merchant: merchant.trim(),
+                category: category ?? '',
+                merchant: '',
+                spent_on: spentOn.trim() || undefined,
                 description: description.trim(),
                 expense_date: getLocalISODate(date),
                 attachment_url: storagePath ?? undefined,
                 items: scannedItems.length > 0 ? scannedItems : undefined,
                 source,
+                _userSetCategory: userSetCategory,
             }, {
                 onSuccess: () => {
-                    if (finalCategory) {
-                        trackCategoryUsage(finalCategory);
+                    if (category && userSetCategory) {
+                        trackCategoryUsage(category);
                     }
                     toast.success('Expense added');
                     setAmount('');
-                    setMerchant('');
+                    setSpentOn('');
                     setDescription('');
                     setCategory(null);
+                    setUserSetCategory(false);
                     setDate(new Date());
                     setErrors({});
                     setAttachmentUri(null);
@@ -233,8 +230,11 @@ export default function AddExpenseScreen() {
 
             // Prefill form with scanned data
             if (result.total) setAmount(String(result.total));
-            if (result.merchant) setMerchant(result.merchant);
-            if (result.category) setCategory(result.category as Category);
+            if (result.merchant) setSpentOn(result.merchant); // map scanned merchant → spentOn
+            if (result.category) {
+                setCategory(result.category as Category);
+                setUserSetCategory(true); // scan result has LLM category — treat as user_set
+            }
             if (result.date) {
                 const parsed = new Date(result.date);
                 if (!isNaN(parsed.getTime())) setDate(parsed);
@@ -275,19 +275,8 @@ export default function AddExpenseScreen() {
         setAttachmentBase64(compressed.base64);
     };
 
-    useEffect(() => {
-        if (!merchant.trim() || merchant.trim().length < 3) return;
-
-        clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(async () => {
-            setIsCategorizing(true);
-            const suggested = await categorizeExpense(merchant, description, categories.map(c => c.name));
-            setCategory(suggested);
-            setIsCategorizing(false);
-        }, 600);
-
-        return () => clearTimeout(debounceRef.current);
-    }, [merchant, categories]);
+    // ── Removed: old merchant-debounce auto-categorization useEffect
+    // Categorization now happens in the background AFTER save (see useAddExpense).
 
     return (
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -350,27 +339,36 @@ export default function AddExpenseScreen() {
                     value={amount}
                     onChangeText={setAmount}
                     keyboardType="decimal-pad"
+                    returnKeyType="next"
                     autoFocus
                 />
                 {errors.amount && <Text style={styles.errorText}>{errors.amount}</Text>}
 
-                <Text style={styles.label}>Merchant</Text>
+                <Text style={styles.label}>Spent on (optional)</Text>
                 <TextInput
-                    style={[styles.input, errors.merchant && { borderColor: '#ff4444' }]}
-                    placeholder="e.g. Swiggy, Uber, DMart"
+                    style={[styles.input, errors.spentOnOrCategory && !spentOn.trim() && { borderColor: '#f59e0b' }]}
+                    placeholder="e.g. Petrol, Chai, Mobile repair"
                     placeholderTextColor={theme.textSecondary}
-                    value={merchant}
-                    onChangeText={setMerchant}
+                    value={spentOn}
+                    onChangeText={t => { setSpentOn(t); if (errors.spentOnOrCategory) setErrors({}); }}
                 />
-                {errors.merchant && <Text style={styles.errorText}>{errors.merchant}</Text>}
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={styles.label}>Category</Text>
-                    {isCategorizing && (
-                        <Text style={{ fontSize: 12, color: '#6C63FF' }}>AI suggesting...</Text>
-                    )}
-                </View>
-                <CategoryPicker selected={category} onSelect={(c) => setCategory(c)} />
+                <Text style={styles.label}>Category</Text>
+                <CategoryPicker
+                    selected={category}
+                    onSelect={(c) => {
+                        setCategory(c);
+                        setUserSetCategory(true);
+                        if (errors.spentOnOrCategory) setErrors({});
+                    }}
+                />
+                {/* Soft validation hint — shown when neither spentOn nor category filled */}
+                {errors.spentOnOrCategory && (
+                    <View style={styles.softHintBox}>
+                        <Ionicons name="information-circle-outline" size={14} color="#f59e0b" />
+                        <Text style={styles.softHintText}>{errors.spentOnOrCategory}</Text>
+                    </View>
+                )}
 
                 <Text style={styles.label}>Date</Text>
                 <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
@@ -379,6 +377,7 @@ export default function AddExpenseScreen() {
                 {showDatePicker && (
                     <DateTimePicker value={date} mode="date" maximumDate={new Date()} onChange={(_, s) => { setShowDatePicker(false); if (s) setDate(s); }} />
                 )}
+
 
                 <Text style={styles.label}>Note (optional)</Text>
                 <TextInput
@@ -514,13 +513,13 @@ export default function AddExpenseScreen() {
                                             <View style={styles.reviewContent}>
                                                 <TextInput
                                                     style={styles.reviewMerchantInput}
-                                                    value={exp.merchant}
+                                                    value={exp.spentOn || exp.merchant || ''}
                                                     onChangeText={(text) => {
                                                         const newArr = [...multipleExpenses];
-                                                        newArr[index] = { ...newArr[index], merchant: text };
+                                                        newArr[index] = { ...newArr[index], spentOn: text, merchant: '' };
                                                         setMultipleExpenses(newArr);
                                                     }}
-                                                    placeholder="Merchant"
+                                                    placeholder="Spent on"
                                                     placeholderTextColor={theme.textSecondary}
                                                     returnKeyType="done"
                                                 />
@@ -653,6 +652,13 @@ function createStyles(theme: Theme) {
         },
 
         label: { fontSize: 13, color: theme.textSecondary, marginBottom: 6, marginTop: 16 },
+        labelSecondary: { color: theme.textSecondary + 'aa', fontSize: 12 },
+        softHintBox: {
+            flexDirection: 'row', alignItems: 'center', gap: 6,
+            backgroundColor: '#f59e0b18', borderRadius: 8, padding: 8, marginTop: 6,
+            borderWidth: 1, borderColor: '#f59e0b44',
+        },
+        softHintText: { fontSize: 13, color: '#f59e0b', flex: 1 },
         amountInput: { fontSize: 40, fontWeight: '700', color: theme.text, borderBottomWidth: 2, borderColor: theme.primary, paddingBottom: 8 },
         input: { borderWidth: 1, borderColor: theme.border, borderRadius: 12, padding: 14, fontSize: 16, backgroundColor: theme.inputBg, color: theme.text, justifyContent: 'center' },
         saveButton: { backgroundColor: theme.primary, borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 32, marginBottom: 60 },

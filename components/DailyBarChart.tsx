@@ -17,6 +17,14 @@ function CompactExpenseRow({ expense, theme }: { expense: any; theme: Theme }) {
     const { getCategoryMeta } = useUserCategories();
     const cat = getCategoryMeta(expense.category);
     const memberName = expense.member_name;
+
+    // ── Display priority: spentOn → merchant → category ──────────────────────
+    const spentOn  = expense.spent_on?.trim() || null;
+    const merchant = expense.merchant?.trim() || null;
+    const catName  = expense.category?.trim() || null;
+    const primaryText   = spentOn ?? merchant ?? catName ?? 'Uncategorized';
+    const secondaryText = spentOn && merchant ? merchant : (!spentOn && !merchant ? catName : null);
+
     return (
         <View style={{
             flexDirection: 'row', alignItems: 'center',
@@ -31,16 +39,24 @@ function CompactExpenseRow({ expense, theme }: { expense: any; theme: Theme }) {
                 <Ionicons name={cat.icon as any} size={16} color={cat.color} />
             </View>
             <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '500', color: theme.text }} numberOfLines={1}>{expense.merchant}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                    <Text style={{ fontSize: 11, color: theme.textSecondary }}>{expense.category}</Text>
-                    {memberName && (
-                        <>
-                            <Text style={{ fontSize: 10, color: theme.textSecondary }}>•</Text>
-                            <Text style={{ fontSize: 11, fontWeight: '500', color: theme.primary }}>👤 {memberName}</Text>
-                        </>
-                    )}
-                </View>
+                <Text style={{ fontSize: 13, fontWeight: '500', color: theme.text }} numberOfLines={1}>
+                    {primaryText}
+                </Text>
+                {secondaryText ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                        <Text style={{ fontSize: 11, color: theme.textSecondary }} numberOfLines={1}>
+                            {secondaryText}
+                        </Text>
+                        {memberName && (
+                            <>
+                                <Text style={{ fontSize: 10, color: theme.textSecondary }}>•</Text>
+                                <Text style={{ fontSize: 11, fontWeight: '500', color: theme.primary }}>👤 {memberName}</Text>
+                            </>
+                        )}
+                    </View>
+                ) : memberName ? (
+                    <Text style={{ fontSize: 11, fontWeight: '500', color: theme.primary, marginTop: 1 }}>👤 {memberName}</Text>
+                ) : null}
             </View>
             <Text style={{ fontSize: 13, fontWeight: '600', color: theme.text }}>{formatAmount(expense.amount)}</Text>
         </View>

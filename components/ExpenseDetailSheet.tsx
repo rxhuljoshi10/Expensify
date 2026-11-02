@@ -121,6 +121,24 @@ export default function ExpenseDetailSheet({ expense, onClose, onEdit, onDelete 
 
     const sourceLabel = expense.source === 'scan' ? '📷 Scanned' : expense.source === 'voice' ? '🎙️ Voice' : '✏️ Manual';
 
+    const isPending = expense._categorizationStatus === 'pending';
+
+    // ── Display priority: spentOn → merchant → category ─────────────────────
+    const spentOn  = expense.spent_on?.trim() || null;
+    const merchant = expense.merchant?.trim() || null;
+    const catName  = expense.category?.trim() || null;
+
+    const headerTitle = spentOn
+        ?? merchant
+        ?? catName
+        ?? (isPending ? 'Categorizing…' : 'Uncategorized');
+
+    // Show merchant as muted subtitle only when spentOn is the primary (context for SMS expenses)
+    const headerMerchant = spentOn && merchant ? merchant : null;
+
+    const displayCategory = isPending ? 'Categorizing…' : (catName || 'Uncategorized');
+    const displayLabel = spentOn || merchant || 'expense';
+
     return (
         <Modal
             visible={visible}
@@ -152,11 +170,18 @@ export default function ExpenseDetailSheet({ expense, onClose, onEdit, onDelete 
                             <Ionicons name={cat.icon as any} size={28} color={cat.color} />
                         </View>
                         <View style={styles.headerInfo}>
-                            <Text style={styles.merchant} numberOfLines={1}>{expense.merchant}</Text>
+                            <Text style={[styles.merchant, isPending && { fontStyle: 'italic', color: theme.textSecondary }]} numberOfLines={1}>
+                                {headerTitle}
+                            </Text>
+                            {headerMerchant && (
+                                <Text style={styles.headerMerchantSub} numberOfLines={1}>{headerMerchant}</Text>
+                            )}
                             <View style={styles.metaRow}>
                                 <Text style={styles.metaText}>{formattedDate}</Text>
                                 <Text style={styles.metaDot}>·</Text>
-                                <Text style={[styles.metaText, { color: cat.color }]}>{expense.category}</Text>
+                                <Text style={[styles.metaText, { color: isPending ? theme.textSecondary : cat.color }]}>
+                                    {displayCategory}
+                                </Text>
                                 <Text style={styles.metaDot}>·</Text>
                                 <Text style={styles.metaText}>{sourceLabel}</Text>
                             </View>
@@ -250,7 +275,7 @@ export default function ExpenseDetailSheet({ expense, onClose, onEdit, onDelete 
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.deleteBtn}
-                                onPress={() => { handleClose(); onDelete(expense.id, expense.merchant); }}
+                                onPress={() => { handleClose(); onDelete(expense.id, displayLabel); }}
                             >
                                 <Ionicons name="trash-outline" size={18} color={theme.danger} />
                                 <Text style={styles.deleteBtnText}>Delete</Text>
@@ -325,6 +350,9 @@ function createStyles(theme: Theme) {
         headerInfo: { flex: 1 },
         merchant: {
             fontSize: 18, fontWeight: '700', color: theme.text,
+        },
+        headerMerchantSub: {
+            fontSize: 13, color: theme.textSecondary, marginTop: 1,
         },
         metaRow: {
             flexDirection: 'row', alignItems: 'center',

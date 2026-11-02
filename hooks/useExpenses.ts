@@ -2,9 +2,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
-import { Expense, CreateExpenseInput } from '../types/expense';
-import { useEffect } from 'react';
+import { Expense, CreateExpenseInput, CategorizationStatus } from '../types/expense';
+import { useEffect, useCallback } from 'react';
 import { useFamilyGroup } from './useFamilyGroup';
+import {
+    categorizeExpense,
+    enqueuePendingCategorization,
+    dequeuePendingCategorizations,
+} from '../lib/ai';
+import { useUserCategories } from './useUserCategories';
 
 const QUERY_KEY = ['expenses'];
 const GROUP_QUERY_KEY = ['group-expenses'];
@@ -30,16 +36,24 @@ export const useExpenses = () => {
     });
 };
 
+// ── Strip client-only fields before sending to DB ──────────────────────
+function toDbPayload(input: CreateExpenseInput) {
+    const { _userSetCategory, ...rest } = input as CreateExpenseInput & { _userSetCategory?: boolean };
+    return rest;
+}
+
 // ── Add a new expense ────────────────────────────────────────────────
 export const useAddExpense = () => {
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
+    const { categories } = useUserCategories();
 
     return useMutation({
         mutationFn: async (input: CreateExpenseInput) => {
+            const payload = toDbPayload(input);
             const { data, error } = await supabase
                 .from('expenses')
-                .insert({ source: 'manual', ...input, user_id: user!.id })
+                .insert({ source: 'manual', ...payload, user_id: user!.id })
                 .select()
                 .single();
             if (error) throw error;
@@ -55,7 +69,7 @@ export const useAddExpense = () => {
             invoke('family-expense', {
                 amount: input.amount,
                 category: input.category,
-                merchant: input.merchant,
+                merchant: input.merchant ?? '',
             });
 
             return data;
@@ -65,12 +79,22 @@ export const useAddExpense = () => {
             await queryClient.cancelQueries({ queryKey: QUERY_KEY });
             const previous = queryClient.getQueryData<Expense[]>(QUERY_KEY);
 
+            // Determine initial categorization status for the optimistic entry
+            const userSetCategory = !!(input as any)._userSetCategory;
+            const needsAutoCategory = !input.category && !!input.spent_on?.trim() && !userSetCategory;
+            const categorizationStatus: CategorizationStatus = userSetCategory
+                ? 'user_set'
+                : needsAutoCategory
+                    ? 'pending'
+                    : 'done';
+
             const optimistic: Expense = {
                 id: `temp-${Date.now()}`,
                 user_id: user!.id,
                 created_at: new Date().toISOString(),
                 source: 'manual',
-                ...input,
+                ...toDbPayload(input),
+                _categorizationStatus: categorizationStatus,
             };
 
             queryClient.setQueryData<Expense[]>(QUERY_KEY, old =>
@@ -79,14 +103,117 @@ export const useAddExpense = () => {
             return { previous };
         },
         onError: (_err, _vars, ctx) => {
-            // Roll back on failure
             queryClient.setQueryData(QUERY_KEY, ctx?.previous);
+        },
+        onSuccess: (savedExpense, input) => {
+            // ── Background auto-categorization ──────────────────────────────────
+            // Only when: user did NOT pick a category, spentOn is present
+            const hint = input.spent_on?.trim();
+            const userSetCategory = !!(input as any)._userSetCategory;
+            const shouldAutoCategory = !userSetCategory && !input.category && !!hint;
+
+            if (shouldAutoCategory && savedExpense?.id) {
+                const expenseId = savedExpense.id;
+                const categoryNames = categories.map(c => c.name);
+
+                // Fire-and-forget — never blocks the UI
+                (async () => {
+                    try {
+                        const suggested = await categorizeExpense(hint!, undefined, categoryNames);
+
+                        // Race-condition guard: only write back if still 'pending' / not user_set
+                        const current = queryClient.getQueryData<Expense[]>(QUERY_KEY);
+                        const cached = current?.find(e => e.id === expenseId);
+                        if (cached && cached._categorizationStatus !== 'user_set') {
+                            await supabase
+                                .from('expenses')
+                                .update({ category: suggested })
+                                .eq('id', expenseId)
+                                .eq('user_id', user!.id);
+
+                            queryClient.setQueryData<Expense[]>(QUERY_KEY, old =>
+                                (old ?? []).map(e =>
+                                    e.id === expenseId
+                                        ? { ...e, category: suggested, _categorizationStatus: 'done' }
+                                        : e
+                                )
+                            );
+                        }
+                    } catch {
+                        // LLM failed or offline — mark failed in cache
+                        queryClient.setQueryData<Expense[]>(QUERY_KEY, old =>
+                            (old ?? []).map(e =>
+                                e.id === expenseId
+                                    ? { ...e, _categorizationStatus: 'failed' }
+                                    : e
+                            )
+                        );
+                        // Persist to retry queue — one attempt on next app open
+                        enqueuePendingCategorization({
+                            expenseId,
+                            hint: hint!,
+                            categories: categoryNames,
+                        });
+                    }
+                })();
+            }
         },
         onSettled: () => {
             // Always refetch to sync real IDs from server
             queryClient.invalidateQueries({ queryKey: QUERY_KEY });
         },
     });
+};
+
+// ── Drain offline categorization retry queue on app open ──────────────
+// Call once from the root layout. Reads queued items from AsyncStorage,
+// fires one categorize attempt each, writes to DB + cache on success.
+// Items that fail again are dropped (single retry per spec).
+export const useDrainCategorizationQueue = () => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+    const { categories } = useUserCategories();
+
+    const drain = useCallback(async () => {
+        if (!user) return;
+        const items = await dequeuePendingCategorizations();
+        if (items.length === 0) return;
+
+        console.log(`[categorize] Draining ${items.length} queued items`);
+        const categoryNames = categories.length > 0 ? categories.map(c => c.name) : (items[0]?.categories ?? []);
+
+        for (const item of items) {
+            try {
+                const suggested = await categorizeExpense(item.hint, undefined, categoryNames);
+
+                // Don't overwrite if user manually set a category in the meantime
+                const current = queryClient.getQueryData<Expense[]>(QUERY_KEY);
+                const cached = current?.find(e => e.id === item.expenseId);
+                if (cached?._categorizationStatus === 'user_set') continue;
+
+                await supabase
+                    .from('expenses')
+                    .update({ category: suggested })
+                    .eq('id', item.expenseId)
+                    .eq('user_id', user.id);
+
+                queryClient.setQueryData<Expense[]>(QUERY_KEY, old =>
+                    (old ?? []).map(e =>
+                        e.id === item.expenseId
+                            ? { ...e, category: suggested, _categorizationStatus: 'done' }
+                            : e
+                    )
+                );
+            } catch {
+                // Single retry only — drop silently if it fails again
+                console.warn(`[categorize] Retry failed for expense ${item.expenseId}`);
+            }
+        }
+
+        queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    }, [user, categories, queryClient]);
+
+    return { drain };
 };
 
 // ── Update an existing expense ───────────────────────────────────────

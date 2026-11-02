@@ -40,6 +40,7 @@ export default function EditExpenseScreen() {
 
     const [amount, setAmount] = useState('');
     const [merchant, setMerchant] = useState('');
+    const [spentOn, setSpentOn] = useState('');
     const [description, setDescription] = useState('');
     const [category, setCategory] = useState<Category>('Food');
     const [date, setDate] = useState(new Date());
@@ -68,7 +69,8 @@ export default function EditExpenseScreen() {
                 return;
             }
             setAmount(String(expense.amount / 100));
-            setMerchant(expense.merchant);
+            setMerchant(expense.merchant ?? '');
+            setSpentOn(expense.spent_on ?? '');
             setDescription(expense.description ?? '');
             setCategory(expense.category);
             setDate(new Date(expense.expense_date));
@@ -117,7 +119,8 @@ export default function EditExpenseScreen() {
                 id,
                 amount: rupeesToPaise(parsed),
                 category,
-                merchant: merchant.trim(),
+                merchant: merchant.trim() || '',
+                spent_on: spentOn.trim() || undefined,
                 description: description.trim(),
                 expense_date: getLocalISODate(date),
                 items: editItems.length > 0 ? editItems : null,
@@ -160,7 +163,8 @@ export default function EditExpenseScreen() {
     };
 
     const handleDelete = () => {
-        Alert.alert('Delete expense', `Remove "${expense.merchant}"?`, [
+        const deleteLabel = expense.spent_on?.trim() || expense.merchant?.trim() || 'this expense';
+        Alert.alert('Delete expense', `Remove "${deleteLabel}"?`, [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Delete', style: 'destructive', onPress: () => {
@@ -185,8 +189,14 @@ export default function EditExpenseScreen() {
                 <Text style={styles.label}>Amount (₹)</Text>
                 <TextInput style={styles.amountInput} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholderTextColor={theme.textSecondary} />
 
-                <Text style={styles.label}>Merchant</Text>
-                <TextInput style={styles.input} value={merchant} onChangeText={setMerchant} placeholderTextColor={theme.textSecondary} />
+                <Text style={styles.label}>Spent on (optional)</Text>
+                <TextInput
+                    style={styles.input}
+                    placeholder="e.g. Petrol, Chai, Mobile repair"
+                    placeholderTextColor={theme.textSecondary}
+                    value={spentOn}
+                    onChangeText={setSpentOn}
+                />
 
                 <Text style={styles.label}>Category</Text>
                 <CategoryPicker selected={category} onSelect={setCategory} />

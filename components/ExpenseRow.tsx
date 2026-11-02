@@ -18,19 +18,62 @@ export default function ExpenseRow({ expense, onPress, onLongPress }: Props) {
     const { getCategoryMeta } = useUserCategories();
     const cat = getCategoryMeta(expense.category);
 
+    const isPending = expense._categorizationStatus === 'pending';
+    const isFailed  = expense._categorizationStatus === 'failed';
+
+    // ── Display logic ───────────────────────────────────────────────────────
+    // Primary priority: spentOn → merchant → category → "Categorizing…" / "Uncategorized"
+    const spentOn   = expense.spent_on?.trim() || null;
+    const merchant  = expense.merchant?.trim() || null;
+    const catName   = expense.category?.trim() || null;
+
+    const primaryText = spentOn
+        ?? merchant
+        ?? catName
+        ?? (isPending ? 'Categorizing…' : 'Uncategorized');
+
+    // Secondary row:
+    // - If spentOn is primary: show merchant (muted) + category pill
+    // - If merchant is primary: show category pill only
+    // - If category is primary: show nothing extra (category is already the primary)
+    const secondaryMerchant = spentOn && merchant ? merchant : null;
+    const showCategoryPill  = primaryText !== catName; // don't repeat category if it's already primary
+
     return (
         <TouchableOpacity style={styles.row} onPress={onPress} onLongPress={onLongPress}>
             <View style={[styles.iconBox, { backgroundColor: cat.color + '22' }]}>
-                <Ionicons name={cat.icon as any} size={20} color={cat.color} />
+                {isPending
+                    ? <Ionicons name="hourglass-outline" size={20} color={theme.textSecondary} />
+                    : <Ionicons name={cat.icon as any} size={20} color={cat.color} />
+                }
             </View>
             <View style={styles.info}>
-                <Text style={styles.merchant} numberOfLines={1}>{expense.merchant}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, paddingRight: 8, flexWrap: 'wrap', gap: 4 }}>
-                    <Text style={styles.category}>{expense.category}</Text>
+                <Text
+                    style={[styles.primary, isPending && styles.primaryPending]}
+                    numberOfLines={1}
+                >
+                    {primaryText}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, flexWrap: 'wrap', gap: 4 }}>
+                    {/* Muted merchant — only shown when spentOn is the primary text */}
+                    {secondaryMerchant && (
+                        <Text style={styles.secondary} numberOfLines={1}>{secondaryMerchant}</Text>
+                    )}
+                    {secondaryMerchant && showCategoryPill && (
+                        <Text style={styles.dotSeparator}>•</Text>
+                    )}
+                    {/* Category pill — hidden when category is already the primary text */}
+                    {showCategoryPill && (
+                        <Text style={styles.category}>
+                            {isPending ? 'Categorizing…' : isFailed ? 'Uncategorized' : (catName ?? '')}
+                        </Text>
+                    )}
                     {(expense as any).member_name && (
                         <>
                             <Text style={styles.dotSeparator}>•</Text>
-                            <Text style={styles.memberBadge} numberOfLines={1}>👤 {(expense as any).member_name}</Text>
+                            <Text style={styles.memberBadge} numberOfLines={1}>
+                                👤 {(expense as any).member_name}
+                            </Text>
                         </>
                     )}
                     {expense.items && expense.items.length > 0 && (
@@ -38,7 +81,9 @@ export default function ExpenseRow({ expense, onPress, onLongPress }: Props) {
                             <Text style={styles.dotSeparator}>•</Text>
                             <View style={styles.itemsBadge}>
                                 <Ionicons name="receipt-outline" size={10} color={theme.primary} />
-                                <Text style={styles.itemsBadgeText}>{expense.items.length} item{expense.items.length > 1 ? 's' : ''}</Text>
+                                <Text style={styles.itemsBadgeText}>
+                                    {expense.items.length} item{expense.items.length > 1 ? 's' : ''}
+                                </Text>
                             </View>
                         </>
                     )}
@@ -62,11 +107,12 @@ function createStyles(theme: Theme) {
             backgroundColor: theme.surface,
         },
         iconBox: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-        icon: { fontSize: 20 },
         info: { flex: 1 },
-        merchant: { fontSize: 15, fontWeight: '500', color: theme.text },
+        primary: { fontSize: 15, fontWeight: '500', color: theme.text },
+        primaryPending: { color: theme.textSecondary, fontStyle: 'italic' },
+        secondary: { fontSize: 12, color: theme.textSecondary, flexShrink: 1 },
         category: { fontSize: 13, color: theme.textSecondary },
-        dotSeparator: { fontSize: 10, color: theme.textSecondary, marginHorizontal: 6, marginTop: 1 },
+        dotSeparator: { fontSize: 10, color: theme.textSecondary, marginHorizontal: 2, marginTop: 1 },
         memberBadge: { flexShrink: 1, fontSize: 11, fontWeight: '500', color: theme.primary, backgroundColor: theme.primary + '11', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
         itemsBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: theme.primary + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
         itemsBadgeText: { fontSize: 11, fontWeight: '600', color: theme.primary },

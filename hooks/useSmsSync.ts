@@ -11,7 +11,7 @@ import { focusManager, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useUserCategories } from './useUserCategories';
-import { processOfflineQueue, expirePendingExpenses } from '../lib/smsSync';
+import { processOfflineQueue, processUnparsedSmsQueue, expirePendingExpenses } from '../lib/smsSync';
 import { supabase } from '../lib/supabase';
 
 // ── One-time background permission prompts ────────────────────────────────
@@ -219,8 +219,9 @@ export function useSmsSync(): void {
 
     const unsubscribe = NetInfo.addEventListener(async (state) => {
       if (state.isConnected && wasOfflineRef.current) {
-        console.log('[useSmsSync] Back online — processing offline queue');
+        console.log('[useSmsSync] Back online — processing offline + unparsed queues');
         await processOfflineQueue(userId, categoryNames);
+        await processUnparsedSmsQueue(userId, categoryNames);  // LLM drain
         queryClient.invalidateQueries({ queryKey: ['expenses'] });
         queryClient.invalidateQueries({ queryKey: ['pending-sms-expenses'] });
       }
@@ -239,4 +240,17 @@ export function useSmsSync(): void {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
     });
   }, [userId]);
+
+  // ── 6. Drain Unparsed SMS Queue on App Open (LLM fallback) ───────────
+  // SMS that local regex couldn't parse are queued and retried via Gemini.
+  // Runs once after mount (with a small delay to let categories load first).
+  useEffect(() => {
+    if (!userId || !smsSyncEnabled) return;
+    const timer = setTimeout(() => {
+      processUnparsedSmsQueue(userId, categoryNames).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      });
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [userId, smsSyncEnabled]);
 }
